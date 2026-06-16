@@ -1,0 +1,15 @@
+{
+  "name": "undef-c",
+  "version": "0.0.0",
+  "description": "Yet another language which wants to replace C.",
+  "private": true,
+  "scripts": {},
+  "type": "module",
+  "dependencies": {
+    "tsx": "^4.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "typescript": "^6.0.3"
+  }
+}

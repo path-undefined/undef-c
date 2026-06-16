@@ -127,20 +127,20 @@ def num2 = $(ptr - 1);
 ### 9. Enums
 
 ```
-type Mode = enum<u32> {
+type Mode = enum {
   READ: 1,
   WRITE: 2,
   EXEC: 4,
-};
+} as u32;
 
 def mode: u32 = Mode.READ | Mode.WRITE;
 
-type Direction = enum<slice<const u8>> {
+type Direction = enum {
   NORTH: "north",
   SOUTH: "south",
   EAST: "east",
   WEST: "west",
-};
+} as slice<const u8>;
 
 def direction: Direction = Direction.NORTH;
 ```
@@ -175,7 +175,7 @@ Reflections:
 #template (T: type) {{
   def serialize = const func (<>, data: #type(T)) -> void {
     #if (!typeinfo(T).isStruct) {{
-      #compile_error "Value to be serialized must be a struct";
+      #compile_error ("Value to be serialized must be a struct");
     }}
 
     #for (field: typeinfo(T).fields) {{
