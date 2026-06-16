@@ -6,9 +6,11 @@ export const tokenDefinitions: TokenDefinition[] = [
 
   { type: "keyword_import", matcher: "import" },
   { type: "keyword_export", matcher: "export" },
-  { type: "keyword_as", matcher: "as" },
   { type: "keyword_include", matcher: "include" },
-  { type: "keyword_extern", matcher: "extern" },
+  { type: "keyword_use", matcher: "use" },
+  { type: "keyword_provide", matcher: "provide" },
+  { type: "keyword_as", matcher: "as" },
+  { type: "keyword_as!", matcher: "as!" },
   { type: "keyword_def", matcher: "def" },
   { type: "keyword_type", matcher: "type" },
   { type: "keyword_const", matcher: "const" },
@@ -34,8 +36,8 @@ export const tokenDefinitions: TokenDefinition[] = [
   { type: "keyword_#else", matcher: "#else" },
   { type: "keyword_#for", matcher: "#for" },
   { type: "keyword_#value", matcher: "#value" },
+  { type: "keyword_#type", matcher: "#type" },
   { type: "keyword_#id", matcher: "#id" },
-  { type: "keyword_#code", matcher: "#code" },
   { type: "keyword_#eval", matcher: "#eval" },
 
   { type: "symbol_;", matcher: ";"},

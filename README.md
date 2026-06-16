@@ -273,14 +273,14 @@ switch (v) {
 Mapping file:
 
 ```
-use "path/to/include/example.h";
+include "path/to/include/example.h";
 
-extern def funcInCHeader: const func (i32, i32) -> i32;
-extern type StructInCHeader: struct {
+use def funcInCHeader: const func (i32, i32) -> i32;
+use type StructInCHeader: struct {
   x: i32,
   y: i32,
 };
-extern def CONSTANT_IN_C_HEADER: i32;
+use def CONSTANT_IN_C_HEADER: i32;
 
 export funcInCHeader;
 export StructInCHeader;
