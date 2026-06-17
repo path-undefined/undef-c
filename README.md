@@ -9,8 +9,8 @@ Language features:
   * Pointers
   * Syntax feeling
 * Improved based on C:
-  * Better typing system with `i32` or `f64` as primitive types
-  * Better type composing system with `array<i32, 5>`, `pointer<i32>` or `array<func (i32) -> i32>`, to avoid the mess in type constructions
+  * Better typing system with `I32` or `F64` as primitive types
+  * Better type composing system with `Array<I32, 5>`, `Pointer<I32>` or `Array<func (I32) -> I32>`, to aVoid the mess in type constructions
   * Module system (namespacing)
   * Receiver syntax for struct
   * A powerful template system which can utilise the whole power of the language itself
@@ -24,24 +24,33 @@ Language features:
 // This is a comment
 ```
 
-### 2. Import and Export
+### 2. Namespacing
 
 ```
-import "./math.uc" as math;
+import "std/io";
+import "std/math";
+import "math" as mymath;
 
-def pi: const f64 = 3.14159;
+use math::*;
+use mymath::sqrt as mysqrt;
 
-export math.add as plus;
+def pi: const F64 = 3.1415926536;
+
+export sqrt;
+export mysqrt;
+export mymath::asin;
+export mymath::acos as myacos;
+export io::*;
 export pi;
 ```
 
 ### 3. Variables, Constants and Assignments
 
 ```
-def pi: const f64 = 3.14159;
-// pi = 5 <-- Not allow because it is const
+def pi: const F64 = 3.1415926536;
+// pi = 5 <-- Error! Because it is const.
 
-def num: i32 = 36;
+def num: I32 = 36;
 def num = 37;
 
 def finish = true; // Automatic type inferrence
@@ -49,26 +58,60 @@ def finish = true; // Automatic type inferrence
 
 ### 4. Functions
 
+Normal function:
+
 ```
-def add = const func (a: i32, b: i32) -> i32 {
-  return a + b
+def add: const = func (a: I32, b: I32) -> I32 {
+  return a + b;
 };
+
+def result = add(3, 5);
+```
+
+With out return values:
+
+```
+import "std/io";
+
+def sayHelloTo: const = func (name: Slice:<U8>) -> Void {
+  io::printf("Hello, %s!\n", name);
+}
+
+sayHelloTo("John");
+```
+
+With error:
+
+```
+type DivError = error {
+  DIVISOR_IS_ZERO,
+};
+
+def div: const = func (a: F64, b: F64) -> F64 {
+  if (b == 0) {
+    throw DivError.DIVISOR_IS_ZERO;
+  }
+
+  return a / b;
+}
+
+def result = div(5, 0) catch 0;
 ```
 
 ### 5. Arrays and Slices
 
 ```
-def arr = array<i32> { 1, 2, 3, 4 };
+def arr = Array:<I32> { 1, 2, 3, 4 };
 
 def i = arr[1];
 arr[0] = 5;
 // 5, 2, 3, 4
 
-def s: slice<i32> = arr[1..];
+def s: Slice:<I32> = arr[1..];
 s[0] = 6;
 // 5, 6, 3, 4
 
-def len: isize = s.length;
+def len: USize = s.length;
 // 3
 ```
 
@@ -76,15 +119,15 @@ def len: isize = s.length;
 
 ```
 type Person = struct {
-  name: slice<const u8>,
-  age: u8,
+  name: Slice:<const U8>,
+  age: U8,
 };
 
-def getOlder = const func Person.() -> void {
-  self.age += 1
+def getOlder: const = func Person.() -> Void {
+  this.age += 1
 };
 
-def person: Person = Person { name: "John Doe", age: 36 };
+def person = Person { name: "John Doe", age: 36 };
 person.getOlder();
 
 def num = person.age;
@@ -95,24 +138,25 @@ def num = person.age;
 
 ```
 type Color = union {
-  value: u32,
+  value: U32,
   struct {
-    a: u8,
-    b: u8,
-    g: u8,
-    r: u8,
+    a: U8,
+    b: U8,
+    g: U8,
+    r: U8,
   },
 };
 
 def color = Color { value: 0xFF0088FF };
-def red = color.r;
+def green = color.g;
+// 0x00 if little endian
 ```
 
 ### 8. Pointers
 
 ```
-def ptr: pointer<i32>;
-def arr = array<i32>{ 1, 2, 3, 4 };
+def ptr: Pointer<I32>;
+def arr = Array<I32>{ 1, 2, 3, 4 };
 
 ptr = @arr;
 ptr += 2;
@@ -133,14 +177,14 @@ type Mode = enum {
   EXEC: 4,
 } as u32;
 
-def mode: u32 = Mode.READ | Mode.WRITE;
+def mode: U32 = Mode.READ | Mode.WRITE;
 
 type Direction = enum {
   NORTH: "north",
   SOUTH: "south",
   EAST: "east",
   WEST: "west",
-} as slice<const u8>;
+} as Slice:<const U8>;
 
 def direction: Direction = Direction.NORTH;
 ```
@@ -150,21 +194,23 @@ def direction: Direction = Direction.NORTH;
 Generics:
 
 ```
-#template (T: type) {{
-  type Box<> = struct {
-    value: #type(T),
+template Box(T: TypeExp) {{
+  type Box:<{{type T}}> = struct {
+    value: {{type T}},
   };
 
-  def set = const func Box<>.(v: #type(T)) -> void {
-    self.value = v;
+  def set = const func Box:<{{type T}}>.(v: {{type T}}) -> Void {
+    this.value = v;
   };
 
-  def get = const func Box<>.() -> #type(T) {
-    return self.value;
-  };
+  def get = const func Box:<{{type T}}>.() -> {{type T}} {
+    return this.value;
+  }
 }}
 
-def box = Box<i32> { value: 36 };
+use template Box(I32);
+
+def box = Box:<I32> { value: 36 };
 box.set(37);
 def num = box.get();
 ```
@@ -172,48 +218,87 @@ def num = box.get();
 Reflections:
 
 ```
-#template (T: type) {{
-  def serialize = const func (<>, data: #type(T)) -> void {
-    #if (!typeinfo(T).isStruct) {{
-      #compile_error ("Value to be serialized must be a struct");
-    }}
+template Serialize(T: TypeExp) {{
+  def serialize:<{{type T}}>: const = const func (data: {{type T}}) -> Void {
+    {{typemeta T as ti}}
 
-    #for (field: typeinfo(T).fields) {{
-      std.io.printf("$s: $v\n", #value(field.name), data.#id(field.name));
-    }}
+    {{if ti.isStruct}}
+      {{throw "Value to be serialized must be a struct"}}
+    {{/if}}
+
+    {{for field in ti.fields}}
+      std.io.printf("%s: %v\n", {{lit field.name}}, data.{{identifier field.name}});
+    {{/for}}
   };
 }}
 
 type Position = struct {
-  x: i32,
-  y: i32,
+  x: I32,
+  y: I32,
 };
 
 def pos = Position { x: 2, y: 3 };
 
-serialize#<Position>(pos);
+use template Serialize(Position);
+serialize:<Position>(pos);
+// x: 2
+// y: 3
 ```
 
 Constants:
 
 ```
-#template (N: i32) {{
-  #eval {{
-    def getFib = const func(n: i32) -> {
+template Fib(N: I32) {{
+  #{{
+    def getFib = const func(n: I32) -> {
       if (n == 1 || n == 2) {
         return 1;
       } else {
         return getFib(n - 1) + getFib(n - 2);
       }
     };
-
-    export getFib;
   }}
 
-  def fib#<>: const i32 = #value(getFib(N));
+  lit fib:<{{type N}}>: I32 = {{value getFib(N)}};
 }}
 
-def result = fib#<5>;
+use template Fib(6);
+
+def result = fib:<6>;
+// Literally equivalent to:
+// def result = 8;
+```
+
+Deal with endians:
+
+```
+template ColorStruct(E: Endian) {{
+  ${{
+    type Endian = enum {
+      LITTLE,
+      BIG,
+    };
+  }}
+
+  type Color = union {
+    value: U32,
+    packed struct {
+      {{if E === Endian.LITTLE}}
+        a: U32, b: U32, g: U32, r: U32,
+      {{/if}}
+
+      {{if E === Endian.BIG}}
+        r: U32, g: U32, b: U32, a: U32,
+      {{/if}}
+    },
+  };
+}}
+
+use template ColorStruct(Endian.BIG);
+
+def color = Color { value: 0xFF0088FF };
+def green = color.g;
+// 0x00 because of big endian
 ```
 
 ### 11. Control Flow
@@ -268,19 +353,19 @@ switch (v) {
 }
 ```
 
-### 12. Interoperate with C
+### 12. Ieroperate with C
 
 Mapping file:
 
 ```
 include "path/to/include/example.h";
 
-use def funcInCHeader: const func (i32, i32) -> i32;
-use type StructInCHeader: struct {
-  x: i32,
-  y: i32,
+use extern def funcInCHeader: const func (I32, I32) -> I32;
+use extern type StructInCHeader: struct {
+  x: I32,
+  y: I32,
 };
-use def CONSTANT_IN_C_HEADER: i32;
+use extern lit CONSTANT_IN_C_HEADER: I32;
 
 export funcInCHeader;
 export StructInCHeader;
@@ -293,7 +378,7 @@ Another file:
 import "std" as std;
 import "./clib.uc" as clib;
 
-def main = const func () -> void {
+def main = const func () -> Void {
   std.io.printf("The constant is %d\n", clib.CONSTANT_IN_C_HEADER);
   std.io.printf("The result is %d\n", clib.funcInCHeader(4, 6));
 };

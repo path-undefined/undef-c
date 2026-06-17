@@ -4,4 +4,6 @@ import { tokenize } from "./tokenizer/tokenizer.js";
 const path = process.argv[2];
 const content = fs.readFileSync(path, "utf8");
 
-console.log(JSON.stringify(tokenize(content), null, 2));
+tokenize(content).forEach((token) => {
+  console.log(token.type, token.raw)
+})

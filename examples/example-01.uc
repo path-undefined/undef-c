@@ -1,5 +1,6 @@
-import "std" as std;
+import "std/io";
 
-def main = const func () -> void {
-  std.io.printf("hello world\n");
+def main: const = func () -> Void {
+  // This is just a random comment
+  io::printf("hello world\n");
 };
