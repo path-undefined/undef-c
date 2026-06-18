@@ -27,21 +27,22 @@ Language features:
 ### 2. Namespacing
 
 ```
-import "std/io";
-import "std/math";
-import "math" as mymath;
+package main;
 
-use math::*;
-use mymath::sqrt as mysqrt;
+use std::math::sin;
+use mymath::sin as mysin;
 
 def pi: const F64 = 3.1415926536;
 
-export sqrt;
-export mysqrt;
-export mymath::asin;
-export mymath::acos as myacos;
-export io::*;
+def result1 = sin(pi);
+def result2 = mysin(pi);
+def result3 = std::math::cos(pi);
+
 export pi;
+export sin;
+export mysin;
+export std::math::cos;
+export mymath::cos as mycos;
 ```
 
 ### 3. Variables, Constants and Assignments
@@ -71,10 +72,8 @@ def result = add(3, 5);
 With out return values:
 
 ```
-import "std/io";
-
 def sayHelloTo: const = func (name: Slice<U8>) -> Void {
-  io::printf("Hello, %s!\n", name);
+  std::io::printf("Hello, %s!\n", name);
 }
 
 sayHelloTo("John");
@@ -83,7 +82,7 @@ sayHelloTo("John");
 With error:
 
 ```
-type DivError = error {
+typ DivError = error {
   DIVISOR_IS_ZERO,
 };
 
@@ -95,7 +94,13 @@ def div: const = func (a: F64, b: F64) -> F64 {
   return a / b;
 }
 
-def result = div(5, 0) catch 0;
+def result: F64;
+
+try {
+  result = div(5, 0);
+} catch (e: DivError) {
+  result = 0;
+}
 ```
 
 ### 5. Arrays and Slices
@@ -118,7 +123,7 @@ def len: USize = s.length;
 ### 6. Structs
 
 ```
-type Person = struct {
+typ Person = struct {
   name: Slice<const U8>,
   age: U8,
 };
@@ -137,7 +142,7 @@ def num = person.age;
 ### 7. Unions
 
 ```
-type Color = union {
+typ Color = union {
   value: U32,
   struct {
     a: U8,
@@ -171,7 +176,7 @@ def num2 = $(ptr - 1);
 ### 9. Enums
 
 ```
-type Mode = enum {
+typ Mode = enum {
   READ: 1,
   WRITE: 2,
   EXEC: 4,
@@ -179,7 +184,7 @@ type Mode = enum {
 
 def mode: U32 = Mode.READ | Mode.WRITE;
 
-type Direction = enum {
+typ Direction = enum {
   NORTH: "north",
   SOUTH: "south",
   EAST: "east",
@@ -194,16 +199,16 @@ def direction: Direction = Direction.NORTH;
 Generics:
 
 ```
-template Box(T: TypeExp) {{
-  type Box<{{type T}}> = struct {
-    value: {{type T}},
+template Box(T: Type) {{
+  typ Box<{{typ T}}> = struct {
+    value: {{typ T}},
   };
 
-  def set = const func Box<{{type T}}>.(v: {{type T}}) -> Void {
+  def set = const func Box<{{typ T}}>.(v: {{typ T}}) -> Void {
     this.value = v;
   };
 
-  def get = const func Box<{{type T}}>.() -> {{type T}} {
+  def get = const func Box<{{typ T}}>.() -> {{typ T}} {
     return this.value;
   }
 }}
@@ -218,21 +223,21 @@ def num = box.get();
 Reflections:
 
 ```
-template Serialize(T: TypeExp) {{
-  def serialize<{{type T}}>: const = const func (data: {{type T}}) -> Void {
-    {{typemeta T as ti}}
+template Serialize(T: Type) {{
+  def serialize<{{typ T}}>: const = const func (data: {{typ T}}) -> Void {
+    {{meta T as ti}}
 
     {{if ti.isStruct}}
       {{throw "Value to be serialized must be a struct"}}
     {{/if}}
 
     {{for field in ti.fields}}
-      std.io.printf("%s: %v\n", {{lit field.name}}, data.{{identifier field.name}});
+      std.io.printf("%s: %v\n", {{lit field.name}}, data.{{id field.name}});
     {{/for}}
   };
 }}
 
-type Position = struct {
+typ Position = struct {
   x: I32,
   y: I32,
 };
@@ -259,7 +264,7 @@ template Fib(N: I32) {{
     };
   }}
 
-  lit fib<{{type N}}>: I32 = {{value getFib(N)}};
+  lit fib<{{typ N}}>: I32 = {{value getFib(N)}};
 }}
 
 use template Fib(6);
@@ -274,13 +279,13 @@ Deal with endians:
 ```
 template ColorStruct(E: Endian) {{
   ${{
-    type Endian = enum {
+    typ Endian = enum {
       LITTLE,
       BIG,
     };
   }}
 
-  type Color = union {
+  typ Color = union {
     value: U32,
     packed struct {
       {{if E === Endian.LITTLE}}
@@ -358,10 +363,12 @@ switch (v) {
 Mapping file:
 
 ```
+package clib;
+
 include "path/to/include/example.h";
 
 use extern def funcInCHeader: const func (I32, I32) -> I32;
-use extern type StructInCHeader: struct {
+use extern typ StructInCHeader: struct {
   x: I32,
   y: I32,
 };
@@ -375,11 +382,10 @@ export CONSTANT_IN_C_HEADER;
 Another file:
 
 ```
-import "std" as std;
-import "./clib.uc" as clib;
+package main;
 
 def main = const func () -> Void {
-  std.io.printf("The constant is %d\n", clib.CONSTANT_IN_C_HEADER);
-  std.io.printf("The result is %d\n", clib.funcInCHeader(4, 6));
+  std::io::printf("The constant is %d\n", clib::CONSTANT_IN_C_HEADER);
+  std::io::printf("The result is %d\n", clib::funcInCHeader(4, 6));
 };
 ```

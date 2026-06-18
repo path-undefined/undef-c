@@ -39,7 +39,7 @@ export function tokenize(source: string): Token[] {
 
           token = {
             type: 'token',
-            name: tokenDefinition.type,
+            name: tokenDefinition.name,
             raw,
             start: {
               line: currentLine,

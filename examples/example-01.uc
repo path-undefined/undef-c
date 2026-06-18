@@ -1,6 +1,6 @@
-import "std/io";
+package main;
 
 def main: const = func () -> Void {
   // This is just a random comment
-  io::printf("hello world\n");
+  std::io::printf("hello world\n");
 };
