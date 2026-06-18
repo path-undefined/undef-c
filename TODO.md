@@ -2,22 +2,19 @@
 
 * Implement a minimal set of grammar so that the compiler can actually work:
   * Implement minimal AST rule set
+  * Directly generate code with AST without context awared semantic checking
 
 The minimal set of grammar is:
-* def
-* func
-* return
-* i32, u32, isize, usize
-* as
-* bool
-* void
-* integer literals
-* bool literals
+* define variables
+* define functions
+* implement functions
+* allocate and recycle memory
+* build-in premitive types
+* assignments
 * if
 * for
-* expressions
-* +, -, *, /, %
-* ==, !=, <, <=, >, >=
-* &&, ||, !
-
-And that's it.
+* switch
+* templating
+* type system
+* [done] expressions
+* [done] literals
