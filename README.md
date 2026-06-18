@@ -73,7 +73,7 @@ With out return values:
 ```
 import "std/io";
 
-def sayHelloTo: const = func (name: Slice:<U8>) -> Void {
+def sayHelloTo: const = func (name: Slice<U8>) -> Void {
   io::printf("Hello, %s!\n", name);
 }
 
@@ -101,13 +101,13 @@ def result = div(5, 0) catch 0;
 ### 5. Arrays and Slices
 
 ```
-def arr = Array:<I32> { 1, 2, 3, 4 };
+def arr = Array<I32> { 1, 2, 3, 4 };
 
 def i = arr[1];
 arr[0] = 5;
 // 5, 2, 3, 4
 
-def s: Slice:<I32> = arr[1..];
+def s: Slice<I32> = arr[1..];
 s[0] = 6;
 // 5, 6, 3, 4
 
@@ -119,7 +119,7 @@ def len: USize = s.length;
 
 ```
 type Person = struct {
-  name: Slice:<const U8>,
+  name: Slice<const U8>,
   age: U8,
 };
 
@@ -184,7 +184,7 @@ type Direction = enum {
   SOUTH: "south",
   EAST: "east",
   WEST: "west",
-} as Slice:<const U8>;
+} as Slice<const U8>;
 
 def direction: Direction = Direction.NORTH;
 ```
@@ -195,22 +195,22 @@ Generics:
 
 ```
 template Box(T: TypeExp) {{
-  type Box:<{{type T}}> = struct {
+  type Box<{{type T}}> = struct {
     value: {{type T}},
   };
 
-  def set = const func Box:<{{type T}}>.(v: {{type T}}) -> Void {
+  def set = const func Box<{{type T}}>.(v: {{type T}}) -> Void {
     this.value = v;
   };
 
-  def get = const func Box:<{{type T}}>.() -> {{type T}} {
+  def get = const func Box<{{type T}}>.() -> {{type T}} {
     return this.value;
   }
 }}
 
 use template Box(I32);
 
-def box = Box:<I32> { value: 36 };
+def box = Box<I32> { value: 36 };
 box.set(37);
 def num = box.get();
 ```
@@ -219,7 +219,7 @@ Reflections:
 
 ```
 template Serialize(T: TypeExp) {{
-  def serialize:<{{type T}}>: const = const func (data: {{type T}}) -> Void {
+  def serialize<{{type T}}>: const = const func (data: {{type T}}) -> Void {
     {{typemeta T as ti}}
 
     {{if ti.isStruct}}
@@ -240,7 +240,7 @@ type Position = struct {
 def pos = Position { x: 2, y: 3 };
 
 use template Serialize(Position);
-serialize:<Position>(pos);
+serialize<Position>(pos);
 // x: 2
 // y: 3
 ```
@@ -259,12 +259,12 @@ template Fib(N: I32) {{
     };
   }}
 
-  lit fib:<{{type N}}>: I32 = {{value getFib(N)}};
+  lit fib<{{type N}}>: I32 = {{value getFib(N)}};
 }}
 
 use template Fib(6);
 
-def result = fib:<6>;
+def result = fib<6>;
 // Literally equivalent to:
 // def result = 8;
 ```

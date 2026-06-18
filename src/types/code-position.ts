@@ -1,4 +1,4 @@
 export type CodePosition = {
-  line: number,
-  char: number,
+  line: number
+  char: number
 }

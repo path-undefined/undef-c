@@ -1,67 +1,75 @@
-import { Token } from "@/types/token"
-import { tokenDefinitions } from "@/definitions/token-definitions"
-import { isRegExp } from "@/types/token-definition";
+import { Token } from '@/types/token'
+import { tokenDefinitions } from '@/tokenizer/token-definitions'
 
 export function tokenize(source: string): Token[] {
-  const tokens: Token[] = [];
-  
-  let copiedSource = `${source}`;
-  let currentLine = 1;
-  let currentChar = 1;
+  const tokens: Token[] = []
+
+  let copiedSource = `${source}`
+  let currentLine = 1
+  let currentChar = 1
 
   while (copiedSource.length > 0) {
-    let token: Token | null = null;
+    let token: Token | null = null
 
     for (const tokenDefinition of tokenDefinitions) {
-      const matcher = tokenDefinition.matcher;
-      let raw = "";
+      const matcher = tokenDefinition.matcher
+      let raw = ''
 
       if (isRegExp(matcher)) {
-        const matchResult = matcher.exec(copiedSource);
+        const matchResult = matcher.exec(copiedSource)
         if (matchResult) {
-          raw = matchResult[0];
+          raw = matchResult[0]
         }
-      } else {
+      }
+      else {
         if (copiedSource.startsWith(matcher)) {
-          raw = matcher;
+          raw = matcher
         }
       }
 
-      if (raw !== "") {
+      if (raw !== '') {
         if (!token || token.raw.length < raw.length) {
-          const linesEaten = raw.split(/(?:\r\n|\r|\n)/);
-          const numOflinesEaten = linesEaten.length - 1;
+          const linesEaten = raw.split(/(?:\r\n|\r|\n)/)
+          const numOfLinesEaten = linesEaten.length - 1
+          const endLine = currentLine + numOfLinesEaten
+          const endChar = numOfLinesEaten === 0
+            ? (currentChar + linesEaten[0].length)
+            : (1 + linesEaten[numOfLinesEaten].length)
+
           token = {
-            type: tokenDefinition.type,
+            type: 'token',
+            name: tokenDefinition.type,
             raw,
             start: {
               line: currentLine,
               char: currentChar,
             },
             end: {
-              line: currentLine + numOflinesEaten,
-              char: numOflinesEaten === 0
-                ? (currentChar + linesEaten[0].length)
-                : (1 + linesEaten[numOflinesEaten].length),
+              line: endLine,
+              char: endChar,
             },
-          };
+          }
         }
       }
     }
 
     if (token === null) {
-      throw new Error(`Unknown token at ${currentLine}:${currentLine}`);
+      throw new Error(`Unknown token at ${currentLine}:${currentLine}`)
     }
 
-    if (token.type !== "line_comment" && token.type !== "trash_character") {
-      tokens.push(token);
+    if (token.name !== 'line_comment' && token.name !== 'trash_character') {
+      tokens.push(token)
     }
 
-    currentLine = token.end.line;
-    currentChar = token.end.char;
+    currentLine = token.end.line
+    currentChar = token.end.char
 
-    copiedSource = copiedSource.substring(token.raw.length);
+    copiedSource = copiedSource.substring(token.raw.length)
   }
 
-  return tokens;
+  return tokens
+}
+
+function isRegExp(m: RegExp | string): m is RegExp {
+  return m instanceof RegExp
 }

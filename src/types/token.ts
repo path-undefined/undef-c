@@ -1,8 +1,9 @@
-import { CodePosition } from "@/types/code-position"
+import { CodePosition } from '@/types/code-position'
 
 export type Token = {
-  type: string,
-  raw: string,
-  start: CodePosition,
-  end: CodePosition,
+  type: 'token'
+  name: string
+  raw: string
+  start: CodePosition
+  end: CodePosition
 }
