@@ -85,7 +85,7 @@ function parseTypeConstraint(tokens: TokenIterator): AstNode {
     throw new CompileError('Unexpected token', colon.start)
   }
 
-  const type = parseIdentifier(tokens)
+  const type = parseTypeExpression(tokens)
 
   return {
     type: 'node',
@@ -102,7 +102,11 @@ function parseIdentifier(tokens: TokenIterator): AstNode {
   const identifier = tokens.pop()
 
   if (!identifier) {
-    throw new CompileError('Identifier expected', tokens.last()?.end)
+    throw new CompileError('Unexpected end of code', tokens.last(2)?.end)
+  }
+
+  if (identifier.name !== 'identifier') {
+    throw new CompileError('Unexpected token', identifier.start)
   }
 
   const children: (AstNode | Token)[] = [identifier]
@@ -123,6 +127,10 @@ function parseIdentifier(tokens: TokenIterator): AstNode {
     children.push(subIdentifier)
   }
 
+  const name = children.length === 1
+    ? 'local_identifier'
+    : 'global_identifier'
+
   if (tokens.peek()?.name === 'symbol_<') {
     const templateParam = parseTemplateArguments(tokens)
 
@@ -133,9 +141,7 @@ function parseIdentifier(tokens: TokenIterator): AstNode {
 
   return {
     type: 'node',
-    name: children.length === 1
-      ? 'local_identifier'
-      : 'global_identifier',
+    name,
     children,
   }
 }
@@ -198,6 +204,7 @@ function parseTemplateArguments(tokens: TokenIterator): AstNode | null {
     'literal_bool',
     'literal_null',
     'identifier',
+    'keyword_const',
   ].includes(tokens.peek()?.name ?? '')) {
     const firstToken = tokens.peek()!
 
@@ -215,7 +222,8 @@ function parseTemplateArguments(tokens: TokenIterator): AstNode | null {
         children.push(parseLiteral(tokens))
         break
       case 'identifier':
-        children.push(parseIdentifier(tokens))
+      case 'keyword_const':
+        children.push(parseTypeExpression(tokens))
         break
     }
 
@@ -294,15 +302,7 @@ function parseFunctionArguments(tokens: TokenIterator): AstNode {
 }
 
 function parseExpression(tokens: TokenIterator): AstNode {
-  const expression = parseExpressionPratt(tokens, 0)
-
-  return {
-    type: 'node',
-    name: 'expression',
-    children: [
-      expression,
-    ],
-  }
+  return parseExpressionPratt(tokens, 0)
 }
 
 function parseExpressionPratt(tokens: TokenIterator, precedence: number): AstNode {
@@ -542,7 +542,7 @@ function parseFunctionInvokeExpression(tokens: TokenIterator, left: AstNode): As
 function parseTypeCastExpression(tokens: TokenIterator, left: AstNode): AstNode {
   tokens.pop()
 
-  const type = parseIdentifier(tokens)
+  const type = parseTypeExpression(tokens)
 
   return {
     type: 'node',
@@ -579,6 +579,40 @@ function parseBinaryExpression(tokens: TokenIterator, left: AstNode, precedence:
       left,
       operator,
       right,
+    ],
+  }
+}
+
+function parseTypeExpression(tokens: TokenIterator): AstNode {
+  const firstToken = tokens.peek()
+
+  if (!firstToken) {
+    throw new CompileError('Unexpected end of code', tokens.last()?.end)
+  }
+
+  switch (firstToken.name) {
+    case 'identifier':
+      return parseIdentifier(tokens)
+    case 'keyword_const':
+      return parseModifiedTypeExpression(tokens)
+    case 'keyword_func':
+    case 'keyword_struct':
+    case 'keyword_union':
+    default:
+      throw new CompileError('Unexpected token', firstToken.start)
+  }
+}
+
+function parseModifiedTypeExpression(tokens: TokenIterator): AstNode {
+  const modifier = tokens.pop()!
+  const type = parseTypeExpression(tokens)
+
+  return {
+    type: 'node',
+    name: 'modified_type_expression',
+    children: [
+      modifier,
+      type,
     ],
   }
 }
