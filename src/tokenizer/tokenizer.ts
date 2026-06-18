@@ -1,5 +1,6 @@
 import { Token } from '@/types/token'
 import { tokenDefinitions } from '@/tokenizer/token-definitions'
+import { CompileError } from '@/error/compile-error'
 
 export function tokenize(source: string): Token[] {
   const tokens: Token[] = []
@@ -54,7 +55,7 @@ export function tokenize(source: string): Token[] {
     }
 
     if (token === null) {
-      throw new Error(`Unknown token at ${currentLine}:${currentLine}`)
+      throw new CompileError('Unknown token', { line: currentLine, char: currentChar })
     }
 
     if (token.name !== 'line_comment' && token.name !== 'trash_character') {

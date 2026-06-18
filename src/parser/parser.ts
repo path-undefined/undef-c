@@ -1,16 +1,6 @@
+import { CompileError } from '@/error/compile-error'
 import { AstNode } from '@/types/ast-node'
-import { CodePosition } from '@/types/code-position'
 import { Token } from '@/types/token'
-
-class ParseError extends Error {
-  public readonly codePosition: CodePosition
-
-  public constructor(message: string, codePosition: CodePosition) {
-    super(message)
-    this.name = 'ParseError'
-    this.codePosition = codePosition
-  }
-}
 
 class TokenAccessor {
   private readonly tokens: Token[]
@@ -77,7 +67,7 @@ function parseExpressionPrefix(tokens: TokenAccessor): AstNode {
   const firstToken = tokens.peek()
 
   if (!firstToken) {
-    throw new ParseError('Expression expected', tokens.last()!.end)
+    throw new CompileError('Expression expected', tokens.last()!.end)
   }
 
   switch (firstToken.name) {
@@ -105,7 +95,7 @@ function parseExpressionPrefix(tokens: TokenAccessor): AstNode {
     case 'symbol_~':
       return parseUnaryExpression(tokens)
     default:
-      throw new ParseError(`Unexpected token ${firstToken.raw}`, firstToken.start)
+      throw new CompileError(`Unexpected token ${firstToken.raw}`, firstToken.start)
   }
 }
 
@@ -150,7 +140,7 @@ function parseExpressionInfix(tokens: TokenAccessor, left: AstNode): AstNode {
   const firstToken = tokens.peek()
 
   if (!firstToken) {
-    throw new ParseError('Token expected', tokens.last()!.end)
+    throw new CompileError('Token expected', tokens.last()!.end)
   }
 
   switch (firstToken.name) {
@@ -183,7 +173,7 @@ function parseExpressionInfix(tokens: TokenAccessor, left: AstNode): AstNode {
     case 'symbol_||':
       return parseBinaryExpression(tokens, left, 20)
     default:
-      throw new ParseError(`Unexpected token ${firstToken.raw}`, firstToken.start)
+      throw new CompileError(`Unexpected token ${firstToken.raw}`, firstToken.start)
   }
 }
 
@@ -195,11 +185,11 @@ function parseParenthesesExpression(tokens: TokenAccessor): AstNode {
   const rightParenthesis = tokens.pop()
 
   if (!rightParenthesis) {
-    throw new ParseError('Parentheses not paired', tokens.last()!.end)
+    throw new CompileError('Parentheses not paired', tokens.last()!.end)
   }
 
   if (rightParenthesis.name !== 'symbol_)') {
-    throw new ParseError(`Unexpected token ${rightParenthesis.raw}`, rightParenthesis.start)
+    throw new CompileError(`Unexpected token ${rightParenthesis.raw}`, rightParenthesis.start)
   }
 
   return expression
@@ -232,7 +222,7 @@ function parseDataAccessExpression(tokens: TokenAccessor, left: AstNode): AstNod
     case 'keyword_as':
       return parseTypeCastExpression(tokens, left)
     default:
-      throw new ParseError(`Unexpected token ${firstToken.raw}`, firstToken.start)
+      throw new CompileError(`Unexpected token ${firstToken.raw}`, firstToken.start)
   }
 }
 
@@ -242,11 +232,11 @@ function parseMemberAccessExpression(tokens: TokenAccessor, left: AstNode): AstN
   const identifier = tokens.pop()
 
   if (!identifier) {
-    throw new ParseError(`Identifier expected`, dot.end)
+    throw new CompileError(`Identifier expected`, dot.end)
   }
 
   if (identifier.name !== 'identifier') {
-    throw new ParseError(`Unexpected token ${identifier.raw}`, identifier.start)
+    throw new CompileError(`Unexpected token ${identifier.raw}`, identifier.start)
   }
 
   return {
@@ -267,11 +257,11 @@ function parseIndexAccessExpression(tokens: TokenAccessor, left: AstNode): AstNo
   const rightBracket = tokens.pop()
 
   if (!rightBracket) {
-    throw new ParseError('Bracket not paired', tokens.last()!.end)
+    throw new CompileError('Bracket not paired', tokens.last()!.end)
   }
 
   if (rightBracket.name !== 'symbol_]') {
-    throw new ParseError(`Unexpected token ${rightBracket.raw}`, rightBracket.start)
+    throw new CompileError(`Unexpected token ${rightBracket.raw}`, rightBracket.start)
   }
 
   return {
@@ -345,7 +335,7 @@ function parseIdentifier(tokens: TokenAccessor): AstNode {
   const identifier = tokens.pop()
 
   if (!identifier) {
-    throw new ParseError('Identifier expected', tokens.last()!.end)
+    throw new CompileError('Identifier expected', tokens.last()!.end)
   }
 
   const children: (AstNode | Token)[] = [identifier]
@@ -356,11 +346,11 @@ function parseIdentifier(tokens: TokenAccessor): AstNode {
     const subIdentifier = tokens.pop()
 
     if (!subIdentifier) {
-      throw new ParseError('Identifier expected', tokens.last()!.end)
+      throw new CompileError('Identifier expected', tokens.last()!.end)
     }
 
     if (subIdentifier.name !== 'identifier') {
-      throw new ParseError(`Unexpected token ${subIdentifier.raw}`, subIdentifier.start)
+      throw new CompileError(`Unexpected token ${subIdentifier.raw}`, subIdentifier.start)
     }
 
     children.push(subIdentifier)
@@ -387,7 +377,7 @@ function parseLiteral(tokens: TokenAccessor): AstNode {
   const literal = tokens.pop()
 
   if (!literal) {
-    throw new ParseError('Literal expected', tokens.last()!.end)
+    throw new CompileError('Literal expected', tokens.last()!.end)
   }
 
   if (![
@@ -402,7 +392,7 @@ function parseLiteral(tokens: TokenAccessor): AstNode {
     'literal_bool',
     'literal_null',
   ].includes(literal.name)) {
-    throw new ParseError(`Unexpected token ${literal.raw}`, literal.start)
+    throw new CompileError(`Unexpected token ${literal.raw}`, literal.start)
   }
 
   return {
@@ -420,11 +410,11 @@ function parseTemplateArguments(tokens: TokenAccessor): AstNode | null {
   const leftChevron = tokens.pop()
 
   if (!leftChevron) {
-    throw new ParseError('Template arguments expected', tokens.last()!.end)
+    throw new CompileError('Template arguments expected', tokens.last()!.end)
   }
 
   if (leftChevron.name !== 'symbol_<') {
-    throw new ParseError(`Unexpected token ${leftChevron.raw}`, leftChevron.start)
+    throw new CompileError(`Unexpected token ${leftChevron.raw}`, leftChevron.start)
   }
 
   const children: (AstNode | Token)[] = []
@@ -465,7 +455,7 @@ function parseTemplateArguments(tokens: TokenAccessor): AstNode | null {
     const nextToken = tokens.peek()
 
     if (!nextToken) {
-      throw new ParseError('Unfinished template argument list', tokens.last()!.end)
+      throw new CompileError('Unfinished template argument list', tokens.last()!.end)
     }
 
     if (nextToken.name !== 'symbol_>' && nextToken.name !== 'symbol_,') {
@@ -481,7 +471,7 @@ function parseTemplateArguments(tokens: TokenAccessor): AstNode | null {
   const rightChevron = tokens.pop()
 
   if (!rightChevron) {
-    throw new ParseError('Chevron not paired', tokens.last()!.end)
+    throw new CompileError('Chevron not paired', tokens.last()!.end)
   }
 
   if (rightChevron.name !== 'symbol_>') {
@@ -500,11 +490,11 @@ function parseFunctionArguments(tokens: TokenAccessor): AstNode {
   const leftParenthesis = tokens.pop()
 
   if (!leftParenthesis) {
-    throw new ParseError('Function arguments expected', tokens.last()!.end)
+    throw new CompileError('Function arguments expected', tokens.last()!.end)
   }
 
   if (leftParenthesis.name !== 'symbol_(') {
-    throw new ParseError(`Unexpected token ${leftParenthesis.raw}`, leftParenthesis.start)
+    throw new CompileError(`Unexpected token ${leftParenthesis.raw}`, leftParenthesis.start)
   }
 
   const children: (AstNode | Token)[] = []
@@ -515,11 +505,11 @@ function parseFunctionArguments(tokens: TokenAccessor): AstNode {
     const nextToken = tokens.peek()
 
     if (!nextToken) {
-      throw new ParseError('Unexpected end of code', tokens.last()!.end)
+      throw new CompileError('Unexpected end of code', tokens.last()!.end)
     }
 
     if (nextToken.name !== 'symbol_)' && nextToken.name !== 'symbol_,') {
-      throw new ParseError(`Unexpected token ${nextToken.raw}`, nextToken.start)
+      throw new CompileError(`Unexpected token ${nextToken.raw}`, nextToken.start)
     }
 
     if (nextToken.name === 'symbol_,') {
