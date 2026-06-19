@@ -1,71 +1,168 @@
 import { CompileError } from '@/error/compile-error'
 import { AstNode } from '@/types/ast-node'
 import { Token } from '@/types/token'
-import { TokenIterator } from '@/parser/token-iterator'
+import { TokenManager } from '@/parser/token-manager'
 
 export function parse(tokens: Token[]): AstNode {
-  const tokenIterator = new TokenIterator(tokens)
+  const tm = new TokenManager(tokens)
 
-  return parseDefStatement(tokenIterator)
-}
-
-function parseDefStatement(tokens: TokenIterator): AstNode {
   const children: (AstNode | Token)[] = []
 
-  const keyword = tokens.pop()
-
-  if (!keyword) {
-    throw new CompileError('Unexpected end of code', tokens.last()?.end)
+  while (tm.peek()) {
+    children.push(parseGlobalStatement(tm))
   }
 
-  if (keyword.name !== 'keyword_def') {
-    throw new CompileError('Unexpected token', keyword.start)
+  return {
+    type: 'node',
+    name: 'root',
+    children,
   }
+}
 
-  const identifier = tokens.pop()
+function parseGlobalStatement(tm: TokenManager): AstNode {
+  const firstToken = tm.expectPeekToBe()
 
-  if (!identifier) {
-    throw new CompileError('Unexpected end of code', tokens.last(2)?.end)
+  switch (firstToken.name) {
+    case 'keyword_package':
+      return parsePackageStatement(tm)
+    case 'keyword_use':
+      return parseUseStatement(tm)
+    case 'keyword_export':
+      return parseExportStatement(tm)
+    case 'keyword_def':
+      return parseDefStatement(tm)
+    case 'keyword_typ':
+      return parseTypStatement(tm)
+    case 'keyword_template':
+      return parseTemplateStatement(tm)
+    default:
+      throw new CompileError('Unexpected token', firstToken.start)
   }
+}
 
-  if (identifier.name !== 'identifier') {
-    throw new CompileError('Unexpected token', identifier.start)
+function parsePackageStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('keyword_package')
+
+  const identifier = parseIdentifier(tm)
+
+  tm.expectNextToBe('sign_;')
+
+  return {
+    type: 'node',
+    name: 'package_statement',
+    children: [
+      identifier,
+    ],
   }
+}
 
-  children.push(identifier)
+function parseUseStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
 
-  let nextToken = tokens.peek()
+  tm.expectNextToBe('keyword_use')
 
-  if (!nextToken) {
-    throw new CompileError('Unexpected end of code', tokens.last()?.end)
+  if (tm.peek()?.name === 'keyword_template') {
+    children.push(tm.next()!)
+
+    const identifier = parseIdentifier(tm)
+    children.push(identifier)
+
+    if (tm.peek()?.name === 'sign_<') {
+      const templateArguments = parseTemplateArguments(tm)!
+      children.push(templateArguments)
+    }
+
+    tm.expectNextToBe('sign_;')
   }
+  else if (tm.peek()?.name === 'keyword_extern') {
+    children.push(tm.next()!)
 
-  if (nextToken.name === 'symbol_:') {
-    children.push(parseTypeConstraint(tokens))
+    const firstToken = tm.expectPeekToBe()
 
-    nextToken = tokens.peek()
-
-    if (!nextToken) {
-      throw new CompileError('Unexpected end of code', tokens.last()?.end)
+    switch (firstToken.name) {
+      case 'keyword_def':
+        children.push(parseDefStatement(tm))
+        break
+      case 'keyword_typ':
+        children.push(parseTypStatement(tm))
+        break
+      case 'keyword_lit':
+        children.push(parseLitStatement(tm))
+        break
+      default:
+        throw new CompileError(`Unexpected token ${firstToken.name}, expected symbol declaration`, firstToken.start)
     }
   }
+  else {
+    const identifier = parseIdentifier(tm)
+    children.push(identifier)
 
-  if (nextToken.name === 'symbol_=') {
-    tokens.pop()
+    if (tm.peek()?.name === 'keyword_as') {
+      tm.next()
 
-    const initialValue = parseExpression(tokens)
+      const alias = tm.expectNextToBe('symbol')
+      children.push(alias)
+    }
+
+    tm.expectNextToBe('sign_;')
+  }
+
+  return {
+    type: 'node',
+    name: 'use_statement',
+    children,
+  }
+}
+
+function parseExportStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  tm.expectNextToBe('keyword_export')
+
+  const identifier = parseIdentifier(tm)
+  children.push(identifier)
+
+  if (tm.peek()?.name === 'keyword_as') {
+    tm.next()
+
+    const alias = tm.expectNextToBe('symbol')
+    children.push(alias)
+  }
+
+  tm.expectNextToBe('sign_;')
+
+  return {
+    type: 'node',
+    name: 'export_statement',
+    children,
+  }
+}
+
+function parseDefStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  tm.expectNextToBe('keyword_def')
+
+  const symbol = tm.expectNextToBe('symbol')
+
+  children.push(symbol)
+
+  let nextToken = tm.expectPeekToBe()
+
+  if (nextToken.name === 'sign_:') {
+    children.push(parseTypeConstraint(tm))
+
+    nextToken = tm.expectPeekToBe()
+  }
+
+  if (nextToken.name === 'sign_=') {
+    tm.next()
+
+    const initialValue = parseExpression(tm)
     children.push(initialValue)
   }
 
-  const semicolon = tokens.pop()
-
-  if (!semicolon) {
-    throw new CompileError('Unexpected end of code', tokens.last()?.end)
-  }
-
-  if (semicolon.name !== 'symbol_;') {
-    throw new CompileError('Unexpected token', semicolon.start)
-  }
+  tm.expectNextToBe('sign_;')
 
   return {
     type: 'node',
@@ -74,18 +171,51 @@ function parseDefStatement(tokens: TokenIterator): AstNode {
   }
 }
 
-function parseTypeConstraint(tokens: TokenIterator): AstNode {
-  const colon = tokens.pop()
+function parseTypStatement(tm: TokenManager): AstNode {
+  throw new Error('This function is not yet implemented')
+}
 
-  if (!colon) {
-    throw new CompileError('Unexpected end of code', tokens.last()?.end)
+function parseLitStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  tm.expectNextToBe('keyword_lit')
+
+  const symbol = tm.expectNextToBe('symbol')
+
+  children.push(symbol)
+
+  let nextToken = tm.expectPeekToBe()
+
+  if (nextToken.name === 'sign_:') {
+    children.push(parseTypeConstraint(tm))
+
+    nextToken = tm.expectPeekToBe()
   }
 
-  if (colon.name !== 'symbol_:') {
-    throw new CompileError('Unexpected token', colon.start)
+  if (nextToken.name === 'sign_=') {
+    tm.next()
+
+    const initialValue = parseExpression(tm)
+    children.push(initialValue)
   }
 
-  const type = parseTypeExpression(tokens)
+  tm.expectNextToBe('sign_;')
+
+  return {
+    type: 'node',
+    name: 'lit_statement',
+    children,
+  }
+}
+
+function parseTemplateStatement(tm: TokenManager): AstNode {
+  throw new Error('This function is not yet implemented')
+}
+
+function parseTypeConstraint(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_:')
+
+  const type = parseTypeExpression(tm)
 
   return {
     type: 'node',
@@ -96,43 +226,22 @@ function parseTypeConstraint(tokens: TokenIterator): AstNode {
   }
 }
 
-// function parseAssignmentStatement(tokens: TokenAccessor): AstNode {}
+function parseIdentifier(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
 
-function parseIdentifier(tokens: TokenIterator): AstNode {
-  const identifier = tokens.pop()
+  const symbol = tm.expectNextToBe('symbol')
 
-  if (!identifier) {
-    throw new CompileError('Unexpected end of code', tokens.last(2)?.end)
+  children.push(symbol)
+
+  while (tm.peek()?.name === 'sign_::') {
+    tm.next()
+
+    const subSymbol = tm.expectNextToBe('symbol')
+    children.push(subSymbol)
   }
 
-  if (identifier.name !== 'identifier') {
-    throw new CompileError('Unexpected token', identifier.start)
-  }
-
-  const children: (AstNode | Token)[] = [identifier]
-
-  while (tokens.peek()?.name === 'symbol_::') {
-    tokens.pop()
-
-    const subIdentifier = tokens.pop()
-
-    if (!subIdentifier) {
-      throw new CompileError('Identifier expected', tokens.last()?.end)
-    }
-
-    if (subIdentifier.name !== 'identifier') {
-      throw new CompileError('Unexpected token', subIdentifier.start)
-    }
-
-    children.push(subIdentifier)
-  }
-
-  const name = children.length === 1
-    ? 'local_identifier'
-    : 'global_identifier'
-
-  if (tokens.peek()?.name === 'symbol_<') {
-    const templateParam = parseTemplateArguments(tokens)
+  if (tm.peek()?.name === 'sign_<') {
+    const templateParam = parseTemplateArguments(tm)
 
     if (templateParam) {
       children.push(templateParam)
@@ -141,17 +250,13 @@ function parseIdentifier(tokens: TokenIterator): AstNode {
 
   return {
     type: 'node',
-    name,
+    name: 'identifier',
     children,
   }
 }
 
-function parseLiteral(tokens: TokenIterator): AstNode {
-  const literal = tokens.pop()
-
-  if (!literal) {
-    throw new CompileError('Literal expected', tokens.last()?.end)
-  }
+function parseLiteral(tm: TokenManager): AstNode {
+  const literal = tm.expectNextToBe()
 
   if (![
     'literal_string',
@@ -165,7 +270,7 @@ function parseLiteral(tokens: TokenIterator): AstNode {
     'literal_bool',
     'literal_null',
   ].includes(literal.name)) {
-    throw new CompileError('Unexpected token', literal.start)
+    throw new CompileError(`Unexpected token ${literal.name}, expect literal_*`, literal.start)
   }
 
   return {
@@ -177,18 +282,10 @@ function parseLiteral(tokens: TokenIterator): AstNode {
   }
 }
 
-function parseTemplateArguments(tokens: TokenIterator): AstNode | null {
-  const currentIndex = tokens.getIndex()
+function parseTemplateArguments(tm: TokenManager): AstNode | null {
+  tm.pushState()
 
-  const leftChevron = tokens.pop()
-
-  if (!leftChevron) {
-    throw new CompileError('Template arguments expected', tokens.last()?.end)
-  }
-
-  if (leftChevron.name !== 'symbol_<') {
-    throw new CompileError('Unexpected token', leftChevron.start)
-  }
+  tm.expectNextToBe('sign_<')
 
   const children: (AstNode | Token)[] = []
 
@@ -203,10 +300,10 @@ function parseTemplateArguments(tokens: TokenIterator): AstNode | null {
     'literal_dec_float',
     'literal_bool',
     'literal_null',
-    'identifier',
+    'symbol',
     'keyword_const',
-  ].includes(tokens.peek()?.name ?? '')) {
-    const firstToken = tokens.peek()!
+  ].includes(tm.peek()?.name ?? '')) {
+    const firstToken = tm.peek()!
 
     switch (firstToken.name) {
       case 'literal_string':
@@ -219,38 +316,40 @@ function parseTemplateArguments(tokens: TokenIterator): AstNode | null {
       case 'literal_dec_float':
       case 'literal_bool':
       case 'literal_null':
-        children.push(parseLiteral(tokens))
+        children.push(parseLiteral(tm))
         break
-      case 'identifier':
+      case 'symbol':
       case 'keyword_const':
-        children.push(parseTypeExpression(tokens))
+        children.push(parseTypeExpression(tm))
         break
     }
 
-    const nextToken = tokens.peek()
+    const nextToken = tm.peek()
 
     if (!nextToken) {
-      throw new CompileError('Unfinished template argument list', tokens.last()?.end)
-    }
-
-    if (nextToken.name !== 'symbol_>' && nextToken.name !== 'symbol_,') {
-      tokens.setIndex(currentIndex)
+      tm.popState()
       return null
     }
 
-    if (nextToken.name === 'symbol_,') {
-      tokens.pop()
+    if (nextToken.name !== 'sign_>' && nextToken.name !== 'sign_,') {
+      tm.popState()
+      return null
+    }
+
+    if (nextToken.name === 'sign_,') {
+      tm.next()
     }
   }
 
-  const rightChevron = tokens.pop()
+  const rightChevron = tm.next()
 
   if (!rightChevron) {
-    throw new CompileError('Chevron not paired', tokens.last()?.end)
+    tm.popState()
+    return null
   }
 
-  if (rightChevron.name !== 'symbol_>') {
-    tokens.setIndex(currentIndex)
+  if (rightChevron.name !== 'sign_>') {
+    tm.popState()
     return null
   }
 
@@ -261,38 +360,38 @@ function parseTemplateArguments(tokens: TokenIterator): AstNode | null {
   }
 }
 
-function parseFunctionArguments(tokens: TokenIterator): AstNode {
-  const leftParenthesis = tokens.pop()
+function parseFunctionArguments(tm: TokenManager): AstNode {
+  const leftParenthesis = tm.next()
 
   if (!leftParenthesis) {
-    throw new CompileError('Function arguments expected', tokens.last()?.end)
+    throw new CompileError('Function arguments expected', tm.last()?.end)
   }
 
-  if (leftParenthesis.name !== 'symbol_(') {
+  if (leftParenthesis.name !== 'sign_(') {
     throw new CompileError('Unexpected token', leftParenthesis.start)
   }
 
   const children: (AstNode | Token)[] = []
 
-  while (tokens.peek()?.name !== 'symbol_)') {
-    children.push(parseExpression(tokens))
+  while (tm.peek()?.name !== 'sign_)') {
+    children.push(parseExpression(tm))
 
-    const nextToken = tokens.peek()
+    const nextToken = tm.peek()
 
     if (!nextToken) {
-      throw new CompileError('Unexpected end of code', tokens.last()?.end)
+      throw new CompileError('Unexpected end of code', tm.last()?.end)
     }
 
-    if (nextToken.name !== 'symbol_)' && nextToken.name !== 'symbol_,') {
+    if (nextToken.name !== 'sign_)' && nextToken.name !== 'sign_,') {
       throw new CompileError('Unexpected token', nextToken.start)
     }
 
-    if (nextToken.name === 'symbol_,') {
-      tokens.pop()
+    if (nextToken.name === 'sign_,') {
+      tm.next()
     }
   }
 
-  tokens.pop()
+  tm.next()
 
   return {
     type: 'node',
@@ -301,35 +400,31 @@ function parseFunctionArguments(tokens: TokenIterator): AstNode {
   }
 }
 
-function parseExpression(tokens: TokenIterator): AstNode {
-  return parseExpressionPratt(tokens, 0)
+function parseExpression(tm: TokenManager): AstNode {
+  return parseExpressionPratt(tm, 0)
 }
 
-function parseExpressionPratt(tokens: TokenIterator, precedence: number): AstNode {
-  let left = parseExpressionPrefix(tokens)
+function parseExpressionPratt(tm: TokenManager, precedence: number): AstNode {
+  let left = parseExpressionPrefix(tm)
 
-  while (precedence < getExpressionInfixPrecedence(tokens)) {
-    left = parseExpressionInfix(tokens, left)
+  while (precedence < getExpressionInfixPrecedence(tm)) {
+    left = parseExpressionInfix(tm, left)
   }
 
   return left
 }
 
-function parseExpressionPrefix(tokens: TokenIterator): AstNode {
-  const firstToken = tokens.peek()
-
-  if (!firstToken) {
-    throw new CompileError('Expression expected', tokens.last()?.end)
-  }
+function parseExpressionPrefix(tm: TokenManager): AstNode {
+  const firstToken = tm.expectPeekToBe()
 
   switch (firstToken.name) {
-    case 'symbol_(':
-      return parseParenthesesExpression(tokens)
-    case 'symbol_$':
-    case 'symbol_@':
-      return parseAddressExpression(tokens)
-    case 'identifier':
-      return parseIdentifier(tokens)
+    case 'sign_(':
+      return parseParenthesesExpression(tm)
+    case 'sign_$':
+    case 'sign_@':
+      return parseAddressExpression(tm)
+    case 'symbol':
+      return parseIdentifier(tm)
     case 'literal_string':
     case 'literal_char':
     case 'literal_hex_integer':
@@ -340,116 +435,112 @@ function parseExpressionPrefix(tokens: TokenIterator): AstNode {
     case 'literal_dec_float':
     case 'literal_bool':
     case 'literal_null':
-      return parseLiteral(tokens)
-    case 'symbol_+':
-    case 'symbol_-':
-    case 'symbol_!':
-    case 'symbol_~':
-      return parseUnaryExpression(tokens)
+      return parseLiteral(tm)
+    case 'sign_+':
+    case 'sign_-':
+    case 'sign_!':
+    case 'sign_~':
+      return parseUnaryExpression(tm)
     default:
       throw new CompileError('Unexpected token', firstToken.start)
   }
 }
 
-function getExpressionInfixPrecedence(tokens: TokenIterator): number {
-  const firstToken = tokens.peek()
+function getExpressionInfixPrecedence(tm: TokenManager): number {
+  const firstToken = tm.peek()
 
   switch (firstToken?.name) {
-    case 'symbol_.':
-    case 'symbol_[':
-    case 'symbol_(':
-    case 'symbol_:':
+    case 'sign_.':
+    case 'sign_[':
+    case 'sign_(':
+    case 'sign_:':
       return 70
-    case 'symbol_*':
-    case 'symbol_/':
-    case 'symbol_%':
-    case 'symbol_<<':
-    case 'symbol_>>':
-    case 'symbol_&':
+    case 'sign_*':
+    case 'sign_/':
+    case 'sign_%':
+    case 'sign_<<':
+    case 'sign_>>':
+    case 'sign_&':
       return 50
-    case 'symbol_+':
-    case 'symbol_-':
-    case 'symbol_|':
-    case 'symbol_^':
+    case 'sign_+':
+    case 'sign_-':
+    case 'sign_|':
+    case 'sign_^':
       return 40
-    case 'symbol_<':
-    case 'symbol_>':
-    case 'symbol_<=':
-    case 'symbol_>=':
-    case 'symbol_==':
-    case 'symbol_!=':
+    case 'sign_<':
+    case 'sign_>':
+    case 'sign_<=':
+    case 'sign_>=':
+    case 'sign_==':
+    case 'sign_!=':
       return 30
-    case 'symbol_&&':
+    case 'sign_&&':
       return 20
-    case 'symbol_||':
+    case 'sign_||':
       return 10
     default:
       return 0
   }
 }
 
-function parseExpressionInfix(tokens: TokenIterator, left: AstNode): AstNode {
-  const firstToken = tokens.peek()
-
-  if (!firstToken) {
-    throw new CompileError('Token expected', tokens.last()?.end)
-  }
+function parseExpressionInfix(tm: TokenManager, left: AstNode): AstNode {
+  const firstToken = tm.expectPeekToBe()
 
   switch (firstToken.name) {
-    case 'symbol_.':
-    case 'symbol_[':
-    case 'symbol_(':
-    case 'symbol_:':
-      return parseDataAccessExpression(tokens, left)
-    case 'symbol_*':
-    case 'symbol_/':
-    case 'symbol_%':
-    case 'symbol_<<':
-    case 'symbol_>>':
-    case 'symbol_&':
-      return parseBinaryExpression(tokens, left, 60)
-    case 'symbol_+':
-    case 'symbol_-':
-    case 'symbol_|':
-    case 'symbol_^':
-      return parseBinaryExpression(tokens, left, 50)
-    case 'symbol_<':
-    case 'symbol_>':
-    case 'symbol_<=':
-    case 'symbol_>=':
-    case 'symbol_==':
-    case 'symbol_!=':
-      return parseBinaryExpression(tokens, left, 40)
-    case 'symbol_&&':
-      return parseBinaryExpression(tokens, left, 30)
-    case 'symbol_||':
-      return parseBinaryExpression(tokens, left, 20)
+    case 'sign_.':
+    case 'sign_[':
+    case 'sign_(':
+    case 'sign_:':
+      return parseDataAccessExpression(tm, left)
+    case 'sign_*':
+    case 'sign_/':
+    case 'sign_%':
+    case 'sign_<<':
+    case 'sign_>>':
+    case 'sign_&':
+      return parseBinaryExpression(tm, left, 60)
+    case 'sign_+':
+    case 'sign_-':
+    case 'sign_|':
+    case 'sign_^':
+      return parseBinaryExpression(tm, left, 50)
+    case 'sign_<':
+    case 'sign_>':
+    case 'sign_<=':
+    case 'sign_>=':
+    case 'sign_==':
+    case 'sign_!=':
+      return parseBinaryExpression(tm, left, 40)
+    case 'sign_&&':
+      return parseBinaryExpression(tm, left, 30)
+    case 'sign_||':
+      return parseBinaryExpression(tm, left, 20)
     default:
       throw new CompileError('Unexpected token', firstToken.start)
   }
 }
 
-function parseParenthesesExpression(tokens: TokenIterator): AstNode {
-  tokens.pop()!
+function parseParenthesesExpression(tm: TokenManager): AstNode {
+  tm.next()
 
-  const expression = parseExpression(tokens)
+  const expression = parseExpression(tm)
 
-  const rightParenthesis = tokens.pop()
+  const rightParenthesis = tm.next()
 
   if (!rightParenthesis) {
-    throw new CompileError('Parentheses not paired', tokens.last()?.end)
+    throw new CompileError('Parentheses not paired', tm.last()?.end)
   }
 
-  if (rightParenthesis.name !== 'symbol_)') {
+  if (rightParenthesis.name !== 'sign_)') {
     throw new CompileError('Unexpected token', rightParenthesis.start)
   }
 
   return expression
 }
 
-function parseAddressExpression(tokens: TokenIterator): AstNode {
-  const operator = tokens.pop()!
-  const right = parseExpressionPratt(tokens, 80)
+function parseAddressExpression(tm: TokenManager): AstNode {
+  const operator = tm.next()!
+  const right = parseExpressionPratt(tm, 80)
 
   return {
     type: 'node',
@@ -461,73 +552,71 @@ function parseAddressExpression(tokens: TokenIterator): AstNode {
   }
 }
 
-function parseDataAccessExpression(tokens: TokenIterator, left: AstNode): AstNode {
-  const firstToken = tokens.peek()!
+function parseDataAccessExpression(tm: TokenManager, left: AstNode): AstNode {
+  const firstToken = tm.peek()!
 
   switch (firstToken.name) {
-    case 'symbol_.':
-      return parseMemberAccessExpression(tokens, left)
-    case 'symbol_[':
-      return parseIndexAccessExpression(tokens, left)
-    case 'symbol_(':
-      return parseFunctionInvokeExpression(tokens, left)
-    case 'symbol_:':
-      return parseTypeCastExpression(tokens, left)
+    case 'sign_.':
+      return parseMemberAccessExpression(tm, left)
+    case 'sign_[':
+      return parseIndexAccessExpression(tm, left)
+    case 'sign_(':
+      return parseFunctionInvokeExpression(tm, left)
+    case 'sign_:':
+      return parseTypeCastExpression(tm, left)
     default:
       throw new CompileError('Unexpected token', firstToken.start)
   }
 }
 
-function parseMemberAccessExpression(tokens: TokenIterator, left: AstNode): AstNode {
-  const dot = tokens.pop()!
+function parseMemberAccessExpression(tm: TokenManager, left: AstNode): AstNode {
+  tm.next()
 
-  const identifier = tokens.pop()
-
-  if (!identifier) {
-    throw new CompileError(`Identifier expected`, dot.end)
-  }
-
-  if (identifier.name !== 'identifier') {
-    throw new CompileError('Unexpected token', identifier.start)
-  }
+  const symbol = tm.expectNextToBe('symbol')
 
   return {
     type: 'node',
     name: 'member_access_expression',
     children: [
       left,
-      identifier,
+      symbol,
     ],
   }
 }
 
-function parseIndexAccessExpression(tokens: TokenIterator, left: AstNode): AstNode {
-  tokens.pop()!
+function parseIndexAccessExpression(tm: TokenManager, left: AstNode): AstNode {
+  tm.next()
 
-  const expression = parseExpression(tokens)
+  const children: (AstNode | Token)[] = []
 
-  const rightBracket = tokens.pop()
-
-  if (!rightBracket) {
-    throw new CompileError('Bracket not paired', tokens.last()?.end)
+  if (tm.peek()?.name !== 'sign_..') {
+    const expression = parseExpression(tm)
+    children.push(expression)
   }
 
-  if (rightBracket.name !== 'symbol_]') {
-    throw new CompileError('Unexpected token', rightBracket.start)
+  if (tm.peek()?.name === 'sign_..') {
+    children.push(tm.next()!)
+
+    if (tm.peek()?.name !== 'sign_]') {
+      const expression = parseExpression(tm)
+      children.push(expression)
+    }
   }
+
+  tm.expectNextToBe('sign_]')
 
   return {
     type: 'node',
     name: 'index_access_expression',
     children: [
       left,
-      expression,
+      ...children,
     ],
   }
 }
 
-function parseFunctionInvokeExpression(tokens: TokenIterator, left: AstNode): AstNode {
-  const functionArguments = parseFunctionArguments(tokens)
+function parseFunctionInvokeExpression(tm: TokenManager, left: AstNode): AstNode {
+  const functionArguments = parseFunctionArguments(tm)
 
   return {
     type: 'node',
@@ -539,10 +628,10 @@ function parseFunctionInvokeExpression(tokens: TokenIterator, left: AstNode): As
   }
 }
 
-function parseTypeCastExpression(tokens: TokenIterator, left: AstNode): AstNode {
-  tokens.pop()
+function parseTypeCastExpression(tm: TokenManager, left: AstNode): AstNode {
+  tm.next()
 
-  const type = parseTypeExpression(tokens)
+  const type = parseTypeExpression(tm)
 
   return {
     type: 'node',
@@ -554,9 +643,9 @@ function parseTypeCastExpression(tokens: TokenIterator, left: AstNode): AstNode 
   }
 }
 
-function parseUnaryExpression(tokens: TokenIterator): AstNode {
-  const operator = tokens.pop()!
-  const right = parseExpressionPratt(tokens, 60)
+function parseUnaryExpression(tm: TokenManager): AstNode {
+  const operator = tm.next()!
+  const right = parseExpressionPratt(tm, 60)
 
   return {
     type: 'node',
@@ -568,9 +657,9 @@ function parseUnaryExpression(tokens: TokenIterator): AstNode {
   }
 }
 
-function parseBinaryExpression(tokens: TokenIterator, left: AstNode, precedence: number): AstNode {
-  const operator = tokens.pop()!
-  const right = parseExpressionPratt(tokens, precedence)
+function parseBinaryExpression(tm: TokenManager, left: AstNode, precedence: number): AstNode {
+  const operator = tm.next()!
+  const right = parseExpressionPratt(tm, precedence)
 
   return {
     type: 'node',
@@ -583,18 +672,14 @@ function parseBinaryExpression(tokens: TokenIterator, left: AstNode, precedence:
   }
 }
 
-function parseTypeExpression(tokens: TokenIterator): AstNode {
-  const firstToken = tokens.peek()
-
-  if (!firstToken) {
-    throw new CompileError('Unexpected end of code', tokens.last()?.end)
-  }
+function parseTypeExpression(tm: TokenManager): AstNode {
+  const firstToken = tm.expectPeekToBe()
 
   switch (firstToken.name) {
-    case 'identifier':
-      return parseIdentifier(tokens)
+    case 'symbol':
+      return parseIdentifier(tm)
     case 'keyword_const':
-      return parseModifiedTypeExpression(tokens)
+      return parseModifiedTypeExpression(tm)
     case 'keyword_func':
     case 'keyword_struct':
     case 'keyword_union':
@@ -603,9 +688,9 @@ function parseTypeExpression(tokens: TokenIterator): AstNode {
   }
 }
 
-function parseModifiedTypeExpression(tokens: TokenIterator): AstNode {
-  const modifier = tokens.pop()!
-  const type = parseTypeExpression(tokens)
+function parseModifiedTypeExpression(tm: TokenManager): AstNode {
+  const modifier = tm.next()!
+  const type = parseTypeExpression(tm)
 
   return {
     type: 'node',

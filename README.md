@@ -199,7 +199,7 @@ def direction: Direction = Direction.NORTH;
 Generics:
 
 ```
-template Box(T: Type) {{
+template Box<T: Type> {{
   typ Box<{{typ T}}> = struct {
     value: {{typ T}},
   };
@@ -213,7 +213,7 @@ template Box(T: Type) {{
   }
 }}
 
-use template Box(I32);
+use template Box<I32>;
 
 def box = Box<I32> { value: 36 };
 box.set(37);
@@ -223,7 +223,7 @@ def num = box.get();
 Reflections:
 
 ```
-template Serialize(T: Type) {{
+template Serialize<T: Type> {{
   def serialize<{{typ T}}>: const = const func (data: {{typ T}}) -> Void {
     {{meta T as ti}}
 
@@ -232,7 +232,7 @@ template Serialize(T: Type) {{
     {{/if}}
 
     {{for field in ti.fields}}
-      std.io.printf("%s: %v\n", {{lit field.name}}, data.{{id field.name}});
+      std.io.printf("%s: %v\n", {{lit field.name}}, data.{{sym field.name}});
     {{/for}}
   };
 }}
@@ -244,7 +244,7 @@ typ Position = struct {
 
 def pos = Position { x: 2, y: 3 };
 
-use template Serialize(Position);
+use template Serialize<Position>;
 serialize<Position>(pos);
 // x: 2
 // y: 3
@@ -253,7 +253,7 @@ serialize<Position>(pos);
 Constants:
 
 ```
-template Fib(N: I32) {{
+template Fib<N: I32> {{
   #{{
     def getFib = const func(n: I32) -> {
       if (n == 1 || n == 2) {
@@ -267,7 +267,7 @@ template Fib(N: I32) {{
   lit fib<{{typ N}}>: I32 = {{value getFib(N)}};
 }}
 
-use template Fib(6);
+use template Fib<6>;
 
 def result = fib<6>;
 // Literally equivalent to:
@@ -277,7 +277,7 @@ def result = fib<6>;
 Deal with endians:
 
 ```
-template ColorStruct(E: Endian) {{
+template ColorStruct<E: Endian> {{
   ${{
     typ Endian = enum {
       LITTLE,
@@ -299,7 +299,7 @@ template ColorStruct(E: Endian) {{
   };
 }}
 
-use template ColorStruct(Endian.BIG);
+use template ColorStruct<Endian.BIG>;
 
 def color = Color { value: 0xFF0088FF };
 def green = color.g;

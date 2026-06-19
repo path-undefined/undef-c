@@ -5,7 +5,8 @@
   * Directly generate code with AST without context awared semantic checking
 
 The minimal set of grammar is:
-* define variables
+* [done] define variables
+* package system
 * define functions
 * implement functions
 * allocate and recycle memory
