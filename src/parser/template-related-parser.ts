@@ -1,0 +1,83 @@
+import { TokenManager } from '@/parser/token-manager'
+import { AstNode } from '@/types/ast-node'
+import { Token } from '@/types/token'
+
+import { parseLiteral } from '@/parser/literal-related-parser'
+import { parseDataAccessExpression } from '@/parser/expression-related-parser'
+import { parseTypeExpression } from '@/parser/type-related-parser'
+
+export function parseTemplateArguments(tm: TokenManager): AstNode | null {
+  tm.pushState()
+
+  tm.expectNextToBe('sign_<')
+
+  const children: (AstNode | Token)[] = []
+
+  while (tm.peek()?.name !== 'sign_>') {
+    const firstToken = tm.peek()!
+
+    switch (firstToken.name) {
+      case 'literal_string':
+      case 'literal_char':
+      case 'literal_hex_integer':
+      case 'literal_oct_integer':
+      case 'literal_bin_integer':
+      case 'literal_dec_integer':
+      case 'literal_hex_float':
+      case 'literal_dec_float':
+      case 'literal_bool':
+      case 'literal_null':
+        children.push(parseLiteral(tm))
+        break
+      case 'sign_[':
+      case 'sign_{':
+      case 'sign_(){':
+      case 'keyword_fun': {
+        let left = parseLiteral(tm)
+        if (tm.peek()?.name === 'sign_:') {
+          left = parseDataAccessExpression(tm, left)
+        }
+        children.push(left)
+        break
+      }
+      case 'symbol':
+      case 'keyword_const':
+        children.push(parseTypeExpression(tm))
+        break
+    }
+
+    const nextToken = tm.peek()
+
+    if (!nextToken) {
+      tm.popState()
+      return null
+    }
+
+    if (tm.peek()?.name !== 'sign_>') {
+      if (tm.peek()?.name !== 'sign_,') {
+        tm.popState()
+        return null
+      }
+
+      tm.next()
+    }
+  }
+
+  const rightChevron = tm.next()
+
+  if (!rightChevron) {
+    tm.popState()
+    return null
+  }
+
+  if (rightChevron.name !== 'sign_>') {
+    tm.popState()
+    return null
+  }
+
+  return {
+    type: 'node',
+    name: 'template_arguments',
+    children,
+  }
+}

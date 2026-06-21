@@ -26,7 +26,7 @@ export class TokenManager {
   public last(): Token | null {
     let index = this.currentIndex
 
-    while (!this.tokens[index] || index > 0) {
+    while (!this.tokens[index] && index > 0) {
       index--
     }
 

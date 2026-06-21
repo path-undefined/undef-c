@@ -4,12 +4,13 @@ A list of operators in the order of precedence:
 
 ```
 MAX Parentheses:  ()
-80  Address:      $ @
-70  DataAccess:   . [] () :
-60  Unary:        + - ! ~
-50  BinaryHigh:   * / % << >> &
-40  BinaryLow:    + - | ^
-30  Comparison:   < > <= >= == !=
-20  LogicAnd:     &&
-10  LogicOr:      ||
+90  Address:      $ @
+80  DataAccess:   . [] () :
+70  Unary:        + - ! ~
+60  BinaryHigh:   * / % << >> &
+50  BinaryLow:    + - | ^
+40  Comparison:   < > <= >= == !=
+30  LogicAnd:     &&
+20  LogicOr:      ||
+10  Assignment:   = += -= *= /= %= <<= >>= &= ^= |=
 ```
