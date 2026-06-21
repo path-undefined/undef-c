@@ -2,19 +2,20 @@ import { TokenManager } from '@/parser/token-manager'
 import { AstNode } from '@/types/ast-node'
 import { Token } from '@/types/token'
 
+import { parseSymbol } from '@/parser/symbol-related-parser'
 import { parseTemplateArguments } from '@/parser/template-related-parser'
 
 export function parseIdentifier(tm: TokenManager): AstNode {
   const children: (AstNode | Token)[] = []
 
-  const symbol = tm.expectNextToBe('symbol')
+  const symbol = parseSymbol(tm)
 
   children.push(symbol)
 
   while (tm.peek()?.name === 'sign_::') {
     tm.next()
 
-    const subSymbol = tm.expectNextToBe('symbol')
+    const subSymbol = parseSymbol(tm)
     children.push(subSymbol)
   }
 

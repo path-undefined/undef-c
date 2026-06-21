@@ -7,6 +7,8 @@ import { parseIdentifier } from '@/parser/identifier-related-parser'
 import { parseLiteral } from '@/parser/literal-related-parser'
 import { parseFunctionArguments } from '@/parser/function-related-parser'
 import { parseTypeExpression } from '@/parser/type-related-parser'
+import { parseSymbol } from '@/parser/symbol-related-parser'
+import { parseBlockStatement } from '@/parser/statement-related-parser'
 
 export function parseExpression(tm: TokenManager): AstNode {
   return parseExpressionPratt(tm, 0)
@@ -31,10 +33,10 @@ export function parseExpressionPrefix(tm: TokenManager): AstNode {
   switch (firstToken.name) {
     case 'sign_(':
       return parseParenthesesExpression(tm)
-    case 'sign_$':
-    case 'sign_@':
-      return parseAddressExpression(tm)
+    case 'sign_${':
+      return parseEvalExpression(tm)
     case 'symbol':
+    case 'sign_{{sym':
       return parseIdentifier(tm)
     case 'literal_string':
     case 'literal_char':
@@ -46,15 +48,23 @@ export function parseExpressionPrefix(tm: TokenManager): AstNode {
     case 'literal_dec_float':
     case 'literal_bool':
     case 'literal_null':
+    case 'sign_{{lit':
     case 'sign_[':
     case 'sign_{':
     case 'sign_(){':
     case 'keyword_fun':
       return parseLiteral(tm)
+    case 'sign_$':
+    case 'sign_@':
+      return parseAddressExpression(tm)
     case 'sign_+':
     case 'sign_-':
     case 'sign_!':
     case 'sign_~':
+    case 'keyword_alloc':
+    case 'keyword_free':
+    case 'keyword_init':
+    case 'keyword_clean':
       return parseUnaryExpression(tm)
     default:
       throw new CompileError(
@@ -143,6 +153,24 @@ export function parseParenthesesExpression(tm: TokenManager): AstNode {
   return expression
 }
 
+export function parseEvalExpression(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  tm.expectNextToBe('sign_${')
+
+  while (tm.peek()?.name !== 'sign_}') {
+    children.push(parseBlockStatement(tm))
+  }
+
+  tm.expectNextToBe('sign_}')
+
+  return {
+    type: 'node',
+    name: 'eval_expression',
+    children,
+  }
+}
+
 export function parseAddressExpression(tm: TokenManager): AstNode {
   const operator = tm.next()!
   const right = parseExpressionPratt(tm, 80)
@@ -177,7 +205,7 @@ export function parseDataAccessExpression(tm: TokenManager, left: AstNode): AstN
 export function parseMemberAccessExpression(tm: TokenManager, left: AstNode): AstNode {
   tm.next()
 
-  const symbol = tm.expectNextToBe('symbol')
+  const symbol = parseSymbol(tm)
 
   return {
     type: 'node',
@@ -250,15 +278,32 @@ export function parseTypeCastExpression(tm: TokenManager, left: AstNode): AstNod
 
 export function parseUnaryExpression(tm: TokenManager): AstNode {
   const operator = tm.next()!
-  const right = parseExpressionPratt(tm, 70)
 
-  return {
-    type: 'node',
-    name: 'unary_expression',
-    children: [
-      operator,
-      right,
-    ],
+  if (operator.name === 'keyword_alloc') {
+    const allocator = parseExpressionPratt(tm, 70)
+    const right = parseTypeExpression(tm)
+
+    return {
+      type: 'node',
+      name: 'unary_expression',
+      children: [
+        operator,
+        allocator,
+        right,
+      ],
+    }
+  }
+  else {
+    const right = parseExpressionPratt(tm, 70)
+
+    return {
+      type: 'node',
+      name: 'unary_expression',
+      children: [
+        operator,
+        right,
+      ],
+    }
   }
 }
 

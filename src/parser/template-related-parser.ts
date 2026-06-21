@@ -3,8 +3,45 @@ import { AstNode } from '@/types/ast-node'
 import { Token } from '@/types/token'
 
 import { parseLiteral } from '@/parser/literal-related-parser'
+import { parseSimpleSymbol } from '@/parser/symbol-related-parser'
 import { parseDataAccessExpression } from '@/parser/expression-related-parser'
-import { parseTypeExpression } from '@/parser/type-related-parser'
+import {
+  parseTypeConstraint,
+  parseTypeExpression,
+} from '@/parser/type-related-parser'
+
+export function parseTemplateParameters(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_<')
+
+  const children: (AstNode | Token)[] = []
+
+  while (tm.peek()?.name !== 'sign_>') {
+    const name = parseSimpleSymbol(tm)
+
+    const typeConstraint = parseTypeConstraint(tm)
+
+    children.push({
+      type: 'node',
+      name: 'template_parameter',
+      children: [
+        name,
+        typeConstraint,
+      ],
+    })
+
+    if (tm.peek()?.name !== 'sign_>') {
+      tm.expectNextToBe('sign_,')
+    }
+  }
+
+  tm.expectNextToBe('sign_>')
+
+  return {
+    type: 'node',
+    name: 'template_parameters',
+    children,
+  }
+}
 
 export function parseTemplateArguments(tm: TokenManager): AstNode | null {
   tm.pushState()
@@ -27,6 +64,7 @@ export function parseTemplateArguments(tm: TokenManager): AstNode | null {
       case 'literal_dec_float':
       case 'literal_bool':
       case 'literal_null':
+      case 'sign_{{lit':
         children.push(parseLiteral(tm))
         break
       case 'sign_[':

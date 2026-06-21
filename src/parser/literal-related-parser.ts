@@ -4,8 +4,9 @@ import { AstNode } from '@/types/ast-node'
 import { Token } from '@/types/token'
 
 import { parseExpression } from '@/parser/expression-related-parser'
-import { parseFunctionBody } from '@/parser/function-related-parser'
+import { parseCodeBlock } from '@/parser/block-related-parser'
 import { parseFunctionTypeExpression } from '@/parser/type-related-parser'
+import { parseSymbol } from '@/parser/symbol-related-parser'
 
 export function parseLiteral(tm: TokenManager): AstNode {
   const firstToken = tm.expectPeekToBe()
@@ -29,6 +30,8 @@ export function parseLiteral(tm: TokenManager): AstNode {
           firstToken,
         ],
       }
+    case 'sign_{{lit':
+      return parseTemplateInterpolatedLiteral(tm)
     case 'sign_[':
       return parseArrayLiteral(tm)
     case 'sign_{':
@@ -48,16 +51,16 @@ export function parseArrayLiteral(tm: TokenManager): AstNode {
 
   const children: (AstNode | Token)[] = []
 
-  while (tm.peek()?.name !== 'sign_}') {
+  while (tm.peek()?.name !== 'sign_]') {
     const element = parseExpression(tm)
     children.push(element)
 
-    if (tm.peek()?.name !== 'sign_}') {
+    if (tm.peek()?.name !== 'sign_]') {
       tm.expectNextToBe('sign_,')
     }
   }
 
-  tm.expectNextToBe('sign_}')
+  tm.expectNextToBe('sign_]')
 
   return {
     type: 'node',
@@ -72,8 +75,10 @@ export function parseStructLiteral(tm: TokenManager): AstNode {
   const children: (AstNode | Token)[] = []
 
   while (tm.peek()?.name !== 'sign_}') {
-    const symbol = tm.expectNextToBe('symbol')
+    const symbol = parseSymbol(tm)
+
     tm.expectNextToBe('sign_=')
+
     const value = parseExpression(tm)
 
     children.push({
@@ -98,7 +103,7 @@ export function parseStructLiteral(tm: TokenManager): AstNode {
 
 export function parseFunctionLiteral(tm: TokenManager): AstNode {
   const type = parseFunctionTypeExpression(tm)
-  const body = parseFunctionBody(tm)
+  const body = parseCodeBlock(tm)
 
   return {
     type: 'node',
@@ -106,6 +111,22 @@ export function parseFunctionLiteral(tm: TokenManager): AstNode {
     children: [
       type,
       body,
+    ],
+  }
+}
+
+export function parseTemplateInterpolatedLiteral(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{lit')
+
+  const expression = parseExpression(tm)
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_interpolated_literal',
+    children: [
+      expression,
     ],
   }
 }

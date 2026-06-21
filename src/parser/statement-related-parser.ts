@@ -5,7 +5,16 @@ import { Token } from '@/types/token'
 
 import { parseExpression } from '@/parser/expression-related-parser'
 import { parseIdentifier } from '@/parser/identifier-related-parser'
-import { parseTemplateArguments } from '@/parser/template-related-parser'
+import { parseSimpleSymbol, parseSymbol } from '@/parser/symbol-related-parser'
+import {
+  parseTemplateArguments,
+  parseTemplateParameters,
+} from '@/parser/template-related-parser'
+import {
+  parseCodeBlock,
+  parseTemplateBlock,
+} from '@/parser/block-related-parser'
+import { parseFunctionParameters } from '@/parser/function-related-parser'
 import {
   parseTypeConstraint,
   parseTypeExpression,
@@ -27,6 +36,62 @@ export function parseGlobalStatement(tm: TokenManager): AstNode {
       return parseTypStatement(tm)
     case 'keyword_tmpl':
       return parseTmplStatement(tm)
+    default:
+      throw new CompileError('Unexpected token', firstToken.start)
+  }
+}
+
+export function parseBlockStatement(tm: TokenManager): AstNode {
+  const firstToken = tm.expectPeekToBe()
+
+  switch (firstToken.name) {
+    case 'keyword_use':
+      return parseUseStatement(tm)
+    case 'keyword_def':
+      return parseDefStatement(tm)
+    case 'keyword_typ':
+      return parseTypStatement(tm)
+    case 'keyword_if':
+      return parseIfStatement(tm)
+    case 'keyword_for':
+      return parseForStatement(tm)
+    case 'keyword_try':
+      return parseTryStatement(tm)
+    case 'keyword_return':
+    case 'keyword_throw':
+    case 'keyword_defer':
+    case 'keyword_break':
+    case 'keyword_continue':
+      return parseBlockEndingStatement(tm)
+    default:
+      return parseExprStatement(tm)
+  }
+}
+
+export function parseTemplateStatement(tm: TokenManager): AstNode {
+  const firstToken = tm.expectPeekToBe()
+
+  switch (firstToken.name) {
+    case 'sign_{{eval':
+      return parseTemplateEvalStatement(tm)
+    case 'sign_{{meta':
+      return parseTemplateMetaStatement(tm)
+    case 'sign_{{if':
+      return parseTemplateIfStatement(tm)
+    case 'sign_{{/if':
+      return parseTemplateEndIfStatement(tm)
+    case 'sign_{{for':
+      return parseTemplateForStatement(tm)
+    case 'sign_{{/for':
+      return parseTemplateEndForStatement(tm)
+    case 'keyword_use':
+      return parseUseStatement(tm)
+    case 'keyword_def':
+      return parseDefStatement(tm)
+    case 'keyword_typ':
+      return parseTypStatement(tm)
+    case 'keyword_lit':
+      return parseLitStatement(tm)
     default:
       throw new CompileError('Unexpected token', firstToken.start)
   }
@@ -92,7 +157,7 @@ export function parseUseStatement(tm: TokenManager): AstNode {
     if (tm.peek()?.name === 'keyword_as') {
       tm.next()
 
-      const alias = tm.expectNextToBe('symbol')
+      const alias = parseSimpleSymbol(tm)
       children.push(alias)
     }
 
@@ -117,7 +182,7 @@ export function parseExportStatement(tm: TokenManager): AstNode {
   if (tm.peek()?.name === 'keyword_as') {
     tm.next()
 
-    const alias = tm.expectNextToBe('symbol')
+    const alias = parseSimpleSymbol(tm)
     children.push(alias)
   }
 
@@ -135,7 +200,7 @@ export function parseDefStatement(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('keyword_def')
 
-  const symbol = tm.expectNextToBe('symbol')
+  const symbol = parseSymbol(tm)
 
   children.push(symbol)
 
@@ -166,7 +231,7 @@ export function parseDefStatement(tm: TokenManager): AstNode {
 export function parseTypStatement(tm: TokenManager): AstNode {
   tm.expectNextToBe('keyword_typ')
 
-  const symbol = tm.expectNextToBe('symbol')
+  const symbol = parseSymbol(tm)
 
   tm.expectNextToBe('sign_=')
 
@@ -176,7 +241,7 @@ export function parseTypStatement(tm: TokenManager): AstNode {
 
   return {
     type: 'node',
-    name: 'def_statement',
+    name: 'typ_statement',
     children: [
       symbol,
       type,
@@ -189,7 +254,7 @@ export function parseLitStatement(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('keyword_lit')
 
-  const symbol = tm.expectNextToBe('symbol')
+  const symbol = parseSymbol(tm)
 
   children.push(symbol)
 
@@ -217,17 +282,190 @@ export function parseLitStatement(tm: TokenManager): AstNode {
   }
 }
 
-export function parseReturnStatement(tm: TokenManager): AstNode {
-  tm.expectNextToBe('keyword_return')
+export function parseIfStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
 
+  const keyword = tm.expectNextToBe('keyword_if')
+  children.push(keyword)
+
+  tm.expectNextToBe('sign_(')
+
+  const condition = parseExpression(tm)
+  children.push(condition)
+
+  tm.expectNextToBe('sign_)')
+
+  const nextToken = tm.expectPeekToBe()
+
+  if (nextToken.name === 'sign_{') {
+    return parseIfElseStatement(tm, children)
+  }
+  else {
+    return parseIfIsStatement(tm, children)
+  }
+}
+
+export function parseIfElseStatement(tm: TokenManager, parsed: (AstNode | Token)[]): AstNode {
+  const children: (AstNode | Token)[] = [...parsed]
+
+  const body = parseCodeBlock(tm)
+  children.push(body)
+
+  while (tm.peek()?.name === 'keyword_elseif') {
+    const keyword = tm.expectNextToBe('keyword_elseif')
+    children.push(keyword)
+
+    tm.expectNextToBe('sign_(')
+
+    const condition = parseExpression(tm)
+    children.push(condition)
+
+    tm.expectNextToBe('sign_)')
+
+    const body = parseCodeBlock(tm)
+    children.push(body)
+  }
+
+  if (tm.peek()?.name === 'keyword_else') {
+    const keyword = tm.expectNextToBe('keyword_else')
+    children.push(keyword)
+
+    const body = parseCodeBlock(tm)
+    children.push(body)
+  }
+
+  return {
+    type: 'node',
+    name: 'if_else_statement',
+    children,
+  }
+}
+
+export function parseIfIsStatement(tm: TokenManager, parsed: (AstNode | Token)[]): AstNode {
+  const children: (AstNode | Token)[] = [...parsed]
+
+  while (tm.peek()?.name === 'keyword_is') {
+    const keyword = tm.expectNextToBe('keyword_is')
+    children.push(keyword)
+
+    tm.expectNextToBe('sign_(')
+
+    const condition = parseExpression(tm)
+    children.push(condition)
+
+    tm.expectNextToBe('sign_)')
+
+    const body = parseCodeBlock(tm)
+    children.push(body)
+  }
+
+  if (tm.peek()?.name === 'keyword_else') {
+    const keyword = tm.expectNextToBe('keyword_else')
+    children.push(keyword)
+
+    const body = parseCodeBlock(tm)
+    children.push(body)
+  }
+
+  return {
+    type: 'node',
+    name: 'if_is_statement',
+    children,
+  }
+}
+
+export function parseForStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  tm.expectNextToBe('keyword_for')
+  tm.expectNextToBe('sign_(')
+
+  let nextToken: Token | null
+
+  nextToken = tm.peek()
+
+  switch (nextToken?.name) {
+    case 'sign_;':
+      tm.next()
+      break
+    case 'keyword_def':
+      children.push(parseDefStatement(tm))
+      break
+    default:
+      children.push(parseExpression(tm))
+      tm.expectNextToBe('sign_;')
+  }
+
+  nextToken = tm.peek()
+
+  switch (nextToken?.name) {
+    case 'sign_;':
+      tm.next()
+      break
+    default:
+      children.push(parseExpression(tm))
+      tm.expectNextToBe('sign_;')
+  }
+
+  nextToken = tm.peek()
+
+  switch (nextToken?.name) {
+    case 'sign_)':
+      tm.next()
+      break
+    default:
+      children.push(parseExpression(tm))
+      tm.expectNextToBe('sign_)')
+  }
+
+  const body = parseCodeBlock(tm)
+  children.push(body)
+
+  return {
+    type: 'node',
+    name: 'for_statement',
+    children,
+  }
+}
+
+export function parseTryStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  const keyword = tm.expectNextToBe('keyword_try')
+  children.push(keyword)
+
+  const tryBlock = parseCodeBlock(tm)
+  children.push(tryBlock)
+
+  while (tm.peek()?.name === 'keyword_catch') {
+    const keyword = tm.expectNextToBe('keyword_catch')
+    children.push(keyword)
+
+    const errorParameters = parseFunctionParameters(tm)
+    children.push(errorParameters)
+
+    const catchBlock = parseCodeBlock(tm)
+    children.push(catchBlock)
+  }
+
+  return {
+    type: 'node',
+    name: 'try_statement',
+    children,
+  }
+}
+
+export function parseBlockEndingStatement(tm: TokenManager): AstNode {
+  const keyword = tm.expectNextToBe()
   const expression = parseExpression(tm)
 
   tm.expectNextToBe('sign_;')
 
   return {
     type: 'node',
-    name: 'return_statement',
+    name: 'returning_statement',
     children: [
+      keyword,
       expression,
     ],
   }
@@ -248,5 +486,115 @@ export function parseExprStatement(tm: TokenManager): AstNode {
 }
 
 export function parseTmplStatement(tm: TokenManager): AstNode {
-  throw new Error('This function is not yet implemented')
+  tm.expectNextToBe('keyword_tmpl')
+
+  const name = parseSymbol(tm)
+
+  const parameters = parseTemplateParameters(tm)
+
+  const block = parseTemplateBlock(tm)
+
+  return {
+    type: 'node',
+    name: 'tmpl_statement',
+    children: [
+      name,
+      parameters,
+      block,
+    ],
+  }
+}
+
+export function parseTemplateEvalStatement(tm: TokenManager): AstNode {
+  const children: (AstNode | Token)[] = []
+
+  tm.expectNextToBe('sign_{{eval')
+
+  while (tm.peek()?.name !== 'sign_}}') {
+    children.push(parseBlockStatement(tm))
+  }
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_eval_statement',
+    children,
+  }
+}
+
+export function parseTemplateMetaStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{meta')
+
+  const type = parseTypeExpression(tm)
+
+  tm.expectNextToBe('keyword_as')
+
+  const symbol = parseSimpleSymbol(tm)
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_meta_statement',
+    children: [
+      type,
+      symbol,
+    ],
+  }
+}
+
+export function parseTemplateIfStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{if')
+
+  const condition = parseTypeExpression(tm)
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_if_statement',
+    children: [
+      condition,
+    ],
+  }
+}
+
+export function parseTemplateEndIfStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{/if')
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_end_if_statement',
+    children: [],
+  }
+}
+
+export function parseTemplateForStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{for')
+
+  const collection = parseTypeExpression(tm)
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_for_statement',
+    children: [
+      collection,
+    ],
+  }
+}
+
+export function parseTemplateEndForStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{/for')
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_end_for_statement',
+    children: [
+    ],
+  }
 }

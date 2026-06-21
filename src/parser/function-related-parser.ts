@@ -4,13 +4,7 @@ import { Token } from '@/types/token'
 
 import { parseTypeConstraint } from '@/parser/type-related-parser'
 import { parseExpression } from '@/parser/expression-related-parser'
-import {
-  parseUseStatement,
-  parseDefStatement,
-  parseTypStatement,
-  parseExprStatement,
-  parseReturnStatement,
-} from '@/parser/statement-related-parser'
+import { parseSymbol } from '@/parser/symbol-related-parser'
 
 export function parseFunctionParameters(tm: TokenManager): AstNode {
   tm.expectNextToBe('sign_(')
@@ -24,7 +18,7 @@ export function parseFunctionParameters(tm: TokenManager): AstNode {
       tm.next()
     }
 
-    const name = tm.expectNextToBe('symbol')
+    const name = parseSymbol(tm)
 
     const typeConstraint = parseTypeConstraint(tm)
 
@@ -76,40 +70,5 @@ export function parseFunctionArguments(tm: TokenManager): AstNode {
     type: 'node',
     name: 'function_arguments',
     children,
-  }
-}
-
-export function parseFunctionBody(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
-
-  tm.expectNextToBe('sign_{')
-
-  while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseFunctionStatement(tm))
-  }
-
-  tm.expectNextToBe('sign_}')
-
-  return {
-    type: 'node',
-    name: 'function_body',
-    children,
-  }
-}
-
-export function parseFunctionStatement(tm: TokenManager): AstNode {
-  const firstToken = tm.expectPeekToBe()
-
-  switch (firstToken.name) {
-    case 'keyword_use':
-      return parseUseStatement(tm)
-    case 'keyword_def':
-      return parseDefStatement(tm)
-    case 'keyword_typ':
-      return parseTypStatement(tm)
-    case 'keyword_return':
-      return parseReturnStatement(tm)
-    default:
-      return parseExprStatement(tm)
   }
 }
