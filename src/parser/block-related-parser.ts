@@ -4,7 +4,7 @@ import { Token } from '@/types/token'
 
 import {
   parseBlockStatement,
-  parseTemplateStatement,
+  parseGlobalStatement,
 } from '@/parser/statement-related-parser'
 
 export function parseCodeBlock(tm: TokenManager): AstNode {
@@ -31,7 +31,7 @@ export function parseTemplateBlock(tm: TokenManager): AstNode {
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseTemplateStatement(tm))
+    children.push(parseGlobalStatement(tm))
   }
 
   tm.expectNextToBe('sign_}')

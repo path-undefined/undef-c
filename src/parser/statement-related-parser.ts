@@ -3,6 +3,7 @@ import { CompileError } from '@/error/compile-error'
 import { AstNode } from '@/types/ast-node'
 import { Token } from '@/types/token'
 
+import { parseLiteral } from '@/parser/literal-related-parser'
 import { parseExpression } from '@/parser/expression-related-parser'
 import { parseIdentifier } from '@/parser/identifier-related-parser'
 import { parseSimpleSymbol, parseSymbol } from '@/parser/symbol-related-parser'
@@ -30,12 +31,30 @@ export function parseGlobalStatement(tm: TokenManager): AstNode {
       return parseUseStatement(tm)
     case 'keyword_export':
       return parseExportStatement(tm)
+    case 'keyword_lit':
+      return parseLitStatement(tm)
     case 'keyword_def':
       return parseDefStatement(tm)
     case 'keyword_typ':
       return parseTypStatement(tm)
     case 'keyword_tmpl':
       return parseTmplStatement(tm)
+
+    case 'sign_{{eval':
+      return parseTemplateEvalStatement(tm)
+    case 'sign_{{meta':
+      return parseTemplateMetaStatement(tm)
+    case 'sign_{{throw':
+      return parseTemplateThrowStatement(tm)
+    case 'sign_{{if':
+      return parseTemplateIfStatement(tm)
+    case 'sign_{{/if':
+      return parseTemplateEndIfStatement(tm)
+    case 'sign_{{for':
+      return parseTemplateForStatement(tm)
+    case 'sign_{{/for':
+      return parseTemplateEndForStatement(tm)
+
     default:
       throw new CompileError('Unexpected token', firstToken.start)
   }
@@ -69,19 +88,13 @@ export function parseBlockStatement(tm: TokenManager): AstNode {
     case 'keyword_break':
     case 'keyword_continue':
       return parseBlockEndingStatement(tm)
-    default:
-      return parseExprStatement(tm)
-  }
-}
 
-export function parseTemplateStatement(tm: TokenManager): AstNode {
-  const firstToken = tm.expectPeekToBe()
-
-  switch (firstToken.name) {
     case 'sign_{{eval':
       return parseTemplateEvalStatement(tm)
     case 'sign_{{meta':
       return parseTemplateMetaStatement(tm)
+    case 'sign_{{throw':
+      return parseTemplateThrowStatement(tm)
     case 'sign_{{if':
       return parseTemplateIfStatement(tm)
     case 'sign_{{/if':
@@ -90,16 +103,9 @@ export function parseTemplateStatement(tm: TokenManager): AstNode {
       return parseTemplateForStatement(tm)
     case 'sign_{{/for':
       return parseTemplateEndForStatement(tm)
-    case 'keyword_use':
-      return parseUseStatement(tm)
-    case 'keyword_def':
-      return parseDefStatement(tm)
-    case 'keyword_typ':
-      return parseTypStatement(tm)
-    case 'keyword_lit':
-      return parseLitStatement(tm)
+
     default:
-      throw new CompileError('Unexpected token', firstToken.start)
+      return parseExprStatement(tm)
   }
 }
 
@@ -134,6 +140,11 @@ export function parseUseStatement(tm: TokenManager): AstNode {
       const templateArguments = parseTemplateArguments(tm)!
       children.push(templateArguments)
     }
+
+    tm.expectNextToBe('sign_;')
+  }
+  else if (tm.peek()?.name === 'literal_string') {
+    children.push(tm.next()!)
 
     tm.expectNextToBe('sign_;')
   }
@@ -182,6 +193,10 @@ export function parseExportStatement(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('keyword_export')
 
+  if (tm.peek()?.name === 'keyword_extern') {
+    children.push(tm.next()!)
+  }
+
   const identifier = parseIdentifier(tm)
   children.push(identifier)
 
@@ -206,9 +221,9 @@ export function parseDefStatement(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('keyword_def')
 
-  const symbol = parseSymbol(tm)
+  const identifier = parseIdentifier(tm)
 
-  children.push(symbol)
+  children.push(identifier)
 
   let nextToken = tm.expectPeekToBe()
 
@@ -237,7 +252,7 @@ export function parseDefStatement(tm: TokenManager): AstNode {
 export function parseTypStatement(tm: TokenManager): AstNode {
   tm.expectNextToBe('keyword_typ')
 
-  const symbol = parseSymbol(tm)
+  const identifier = parseIdentifier(tm)
 
   tm.expectNextToBe('sign_=')
 
@@ -249,7 +264,7 @@ export function parseTypStatement(tm: TokenManager): AstNode {
     type: 'node',
     name: 'typ_statement',
     children: [
-      symbol,
+      identifier,
       type,
     ],
   }
@@ -260,9 +275,9 @@ export function parseLitStatement(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('keyword_lit')
 
-  const symbol = parseSymbol(tm)
+  const identifier = parseIdentifier(tm)
 
-  children.push(symbol)
+  children.push(identifier)
 
   let nextToken = tm.expectPeekToBe()
 
@@ -634,10 +649,26 @@ export function parseTemplateMetaStatement(tm: TokenManager): AstNode {
   }
 }
 
+export function parseTemplateThrowStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{throw')
+
+  const reason = parseLiteral(tm)
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_meta_statement',
+    children: [
+      reason,
+    ],
+  }
+}
+
 export function parseTemplateIfStatement(tm: TokenManager): AstNode {
   tm.expectNextToBe('sign_{{if')
 
-  const condition = parseTypeExpression(tm)
+  const condition = parseExpression(tm)
 
   tm.expectNextToBe('sign_}}')
 
@@ -664,7 +695,11 @@ export function parseTemplateEndIfStatement(tm: TokenManager): AstNode {
 export function parseTemplateForStatement(tm: TokenManager): AstNode {
   tm.expectNextToBe('sign_{{for')
 
-  const collection = parseTypeExpression(tm)
+  const symbol = parseSymbol(tm)
+
+  tm.expectNextToBe('keyword_in')
+
+  const collection = parseExpression(tm)
 
   tm.expectNextToBe('sign_}}')
 
@@ -672,6 +707,7 @@ export function parseTemplateForStatement(tm: TokenManager): AstNode {
     type: 'node',
     name: 'template_for_statement',
     children: [
+      symbol,
       collection,
     ],
   }

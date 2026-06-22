@@ -79,6 +79,7 @@ export function parseTemplateArguments(tm: TokenManager): AstNode | null {
         break
       }
       case 'symbol':
+      case 'sign_{{sym':
       case 'keyword_const':
         children.push(parseTypeExpression(tm))
         break

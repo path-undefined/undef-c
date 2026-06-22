@@ -32,7 +32,7 @@ export function parseTypeExpression(tm: TokenManager): AstNode | Token {
     case 'keyword_packed':
       return parseModifiedTypeExpression(tm)
     case 'symbol':
-    case 'sign_{{typ':
+    case 'sign_{{sym':
       return parseIdentifier(tm)
     case 'keyword_fun':
       return parseFunctionTypeExpression(tm)
@@ -185,10 +185,10 @@ export function parseUnionEntry(tm: TokenManager): AstNode {
   const nextToken = tm.expectPeekToBe()
 
   switch (nextToken.name) {
-    case 'keyword_symbol':
+    case 'symbol':
     case 'sign_{{sym':
       children.push(parseSymbol(tm))
-      children.push(parseTypeExpression(tm))
+      children.push(parseTypeConstraint(tm))
       break
     default:
       children.push(parseTypeExpression(tm))
