@@ -1,3 +1,3 @@
-export function generate(ast: AstNode): string {
-
+export function generate(): string {
+  return ''
 }

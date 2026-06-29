@@ -34,7 +34,7 @@ export function parseTypeExpression(tm: TokenManager): AstNode | Token {
     case 'symbol':
     case 'sign_{{sym':
       return parseIdentifier(tm)
-    case 'keyword_fun':
+    case 'sign_(':
       return parseFunctionTypeExpression(tm)
     case 'keyword_struct':
       return parseStructTypeExpression(tm)
@@ -51,8 +51,6 @@ export function parseTypeExpression(tm: TokenManager): AstNode | Token {
 
 export function parseFunctionTypeExpression(tm: TokenManager): AstNode {
   const children: (AstNode | Token)[] = []
-
-  tm.expectNextToBe('keyword_fun')
 
   const parameters = parseFunctionParameters(tm)
   children.push(parameters)

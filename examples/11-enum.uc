@@ -13,7 +13,7 @@ typ Direction = enum {
   WEST = "west",
 }: Slice<const U8>;
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   def mode: U32 = Mode.READ | Mode.WRITE;
 
   if (mode & Mode.READ > 0) {

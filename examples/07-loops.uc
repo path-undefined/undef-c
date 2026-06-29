@@ -1,6 +1,6 @@
 package main;
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   def arr: Array<I32, 10>;
 
   for (def i: USize = 0; i < 10; i += 1) {

@@ -1,6 +1,6 @@
 package main;
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   for (def i: USize = 0; i < 100; i += 1) {
     if (i % 2 == 0) {
       std::io::printf("%d is a multiply of 2.\n", i);

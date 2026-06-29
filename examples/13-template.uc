@@ -14,7 +14,7 @@ tmpl Box<T: Type> {
 }
 
 tmpl Serialize<T: Type> {
-  def serialize<{{sym T}}>: const = fun (data: {{sym T}}) -> Void {
+  fun serialize<{{sym T}}>(data: {{sym T}}) -> Void {
     {{meta T as ti}}
 
     {{if !ti.isStruct}}
@@ -29,7 +29,7 @@ tmpl Serialize<T: Type> {
 
 tmpl Fib<N: I32> {
   {{eval
-    def getFib: const = fun (n: I32) -> I32 {
+    fun getFib(n: I32) -> I32 {
       if (n == 1 || n == 2) {
         return 1;
       } else {
@@ -41,7 +41,7 @@ tmpl Fib<N: I32> {
   lit fib<{{sym N}}>: I32 = {{lit getFib(N)}};
 }
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   use tmpl Box<I32>;
 
   def box = { value = 36 }: Box<I32>;

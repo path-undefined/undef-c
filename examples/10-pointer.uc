@@ -1,6 +1,6 @@
 package main;
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   def ptr: Pointer<I32>;
   def arr = [ 1, 2, 3, 4 ]: Array<I32>;
   def num: I32 = 5;

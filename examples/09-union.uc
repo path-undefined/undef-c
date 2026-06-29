@@ -10,7 +10,7 @@ typ Color = union {
   },
 };
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   def color = { value = 0xEE8800FF }: Color;
 
   std::io::printf("The Hex value of the color is %0x08X.\n", color.value);

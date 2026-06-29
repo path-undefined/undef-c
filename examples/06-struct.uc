@@ -9,7 +9,7 @@ typ Person = struct {
   },
 };
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   def person1 = { name = "John Doe", age = 36 }: Person;
   def person2: Person = { name = "Jane Joe", age = 27 };
 

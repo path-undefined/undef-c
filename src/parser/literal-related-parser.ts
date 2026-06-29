@@ -102,6 +102,8 @@ export function parseStructLiteral(tm: TokenManager): AstNode {
 }
 
 export function parseFunctionLiteral(tm: TokenManager): AstNode {
+  tm.expectNextToBe('keyword_fun')
+
   const type = parseFunctionTypeExpression(tm)
   const body = parseCodeBlock(tm)
 

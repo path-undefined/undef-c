@@ -13,7 +13,7 @@ use "stdio.h";
 
 use extern def printf: const fun (format: Slice<const U8>, ...args: Slice<Any>) -> Void;
 
-def add: const = fun (a: I32, b: I32) -> I32 {
+fun add(a: I32, b: I32) -> I32 {
   return a + b;
 };
 

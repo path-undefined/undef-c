@@ -1,6 +1,6 @@
 package main;
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   def pi: const F64 = 3.1415926536;
 
   std::io::printf("Contant pi is: %d.\n", pi);

@@ -1,6 +1,6 @@
 package main;
 
-def main: const = fun () -> Void {
+fun main() -> Void {
   std::io::printf("Adding 5 and 6 is %d.\n", add(5, 6));
   std::io::printf("The sum of 2, 3, 5, 7 is %d.\n", sum(2, 3, 5, 7));
 
@@ -13,11 +13,11 @@ def main: const = fun () -> Void {
   }
 };
 
-def add: const = fun (a: I32, b: I32) -> I32 {
+fun add(a: I32, b: I32) -> I32 {
   return a + b;
 };
 
-def sum: const = fun (...n: Slice<I32>) -> I32 {
+fun sum(...n: Slice<I32>) -> I32 {
   def result: I32 = 0;
 
   for (def i: USize = 0; i < n.length; i += 1) {
@@ -27,7 +27,7 @@ def sum: const = fun (...n: Slice<I32>) -> I32 {
   return result;
 };
 
-def sayHelloTo: const = fun (name: Slice<U8>) -> Void {
+fun sayHelloTo(name: Slice<U8>) -> Void {
   std::io::printf("Hello, %s!\n", name);
 };
 
@@ -35,7 +35,7 @@ typ DivError = error {
   DIVISOR_IS_ZERO,
 };
 
-def div: const = fun (a: F64, b: F64) -> F64 throw DivError {
+fun div(a: F64, b: F64) -> F64 throw DivError {
   if (b == 0) {
     throw DivError.DIVISOR_IS_ZERO;
   }

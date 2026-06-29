@@ -17,6 +17,7 @@ import {
 } from '@/parser/block-related-parser'
 import { parseFunctionParameters } from '@/parser/function-related-parser'
 import {
+  parseFunctionTypeExpression,
   parseTypeConstraint,
   parseTypeExpression,
 } from '@/parser/type-related-parser'
@@ -35,6 +36,8 @@ export function parseGlobalStatement(tm: TokenManager): AstNode {
       return parseLitStatement(tm)
     case 'keyword_def':
       return parseDefStatement(tm)
+    case 'keyword_fun':
+      return parseFunStatement(tm)
     case 'keyword_typ':
       return parseTypStatement(tm)
     case 'keyword_tmpl':
@@ -54,6 +57,9 @@ export function parseGlobalStatement(tm: TokenManager): AstNode {
       return parseTemplateForStatement(tm)
     case 'sign_{{/for':
       return parseTemplateEndForStatement(tm)
+
+    case 'sign_;':
+      return parseEmptyStatement(tm)
 
     default:
       throw new CompileError('Unexpected token', firstToken.start)
@@ -246,6 +252,26 @@ export function parseDefStatement(tm: TokenManager): AstNode {
     type: 'node',
     name: 'def_statement',
     children,
+  }
+}
+
+export function parseFunStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('keyword_fun')
+
+  const identifier = parseIdentifier(tm)
+  const type = parseFunctionTypeExpression(tm)
+  const body = parseCodeBlock(tm)
+
+  tm.expectNextToBe('sign_;')
+
+  return {
+    type: 'node',
+    name: 'fun_statement',
+    children: [
+      identifier,
+      type,
+      body,
+    ],
   }
 }
 
@@ -722,5 +748,15 @@ export function parseTemplateEndForStatement(tm: TokenManager): AstNode {
     name: 'template_end_for_statement',
     children: [
     ],
+  }
+}
+
+export function parseEmptyStatement(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_;')
+
+  return {
+    type: 'node',
+    name: 'empty_statement',
+    children: [],
   }
 }
