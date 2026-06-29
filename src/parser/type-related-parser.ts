@@ -29,7 +29,6 @@ export function parseTypeExpression(tm: TokenManager): AstNode | Token {
     case 'keyword_any':
       return parseAnyTypeExpression(tm)
     case 'keyword_const':
-    case 'keyword_packed':
       return parseModifiedTypeExpression(tm)
     case 'symbol':
     case 'sign_{{sym':
