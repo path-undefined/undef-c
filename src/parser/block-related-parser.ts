@@ -1,6 +1,5 @@
 import { TokenManager } from '@/parser/token-manager'
 import { AstNode } from '@/types/ast-node'
-import { Token } from '@/types/token'
 
 import {
   parseBlockStatement,
@@ -8,12 +7,12 @@ import {
 } from '@/parser/statement-related-parser'
 
 export function parseCodeBlock(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const statements: AstNode[] = []
 
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseBlockStatement(tm))
+    statements.push(parseBlockStatement(tm))
   }
 
   tm.expectNextToBe('sign_}')
@@ -21,17 +20,19 @@ export function parseCodeBlock(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'code_block',
-    children,
+    children: {
+      statements,
+    },
   }
 }
 
 export function parseTemplateBlock(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const statements: AstNode[] = []
 
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseGlobalStatement(tm))
+    statements.push(parseGlobalStatement(tm))
   }
 
   tm.expectNextToBe('sign_}')
@@ -39,6 +40,8 @@ export function parseTemplateBlock(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'template_block',
-    children,
+    children: {
+      statements,
+    },
   }
 }

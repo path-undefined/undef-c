@@ -1,6 +1,6 @@
-package main;
+use package std::io;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   def ptr: Pointer<I32>;
   def arr = [ 1, 2, 3, 4 ]: Array<I32>;
   def num: I32 = 5;

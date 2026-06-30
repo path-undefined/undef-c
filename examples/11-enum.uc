@@ -1,19 +1,19 @@
-package main;
+use package std::io;
 
-typ Mode = enum {
+type Mode = enum {
   READ = 1,
   WRITE = 2,
   EXEC = 4,
 }: U32;
 
-typ Direction = enum {
+type Direction = enum {
   NORTH = "north",
   SOUTH = "south",
   EAST = "east",
   WEST = "west",
 }: Slice<const U8>;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   def mode: U32 = Mode.READ | Mode.WRITE;
 
   if (mode & Mode.READ > 0) {

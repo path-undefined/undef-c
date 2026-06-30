@@ -1,6 +1,6 @@
-package main;
+use package std::io;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   std::io::printf("Adding 5 and 6 is %d.\n", add(5, 6));
   std::io::printf("The sum of 2, 3, 5, 7 is %d.\n", sum(2, 3, 5, 7));
 
@@ -13,11 +13,11 @@ fun main() -> Void {
   }
 };
 
-fun add(a: I32, b: I32) -> I32 {
+lit add = fun (a: I32, b: I32) -> I32 {
   return a + b;
 };
 
-fun sum(...n: Slice<I32>) -> I32 {
+lit sum = fun (...n: Slice<I32>) -> I32 {
   def result: I32 = 0;
 
   for (def i: USize = 0; i < n.length; i += 1) {
@@ -27,15 +27,15 @@ fun sum(...n: Slice<I32>) -> I32 {
   return result;
 };
 
-fun sayHelloTo(name: Slice<U8>) -> Void {
+lit sayHelloTo = fun (name: Slice<U8>) -> Void {
   std::io::printf("Hello, %s!\n", name);
 };
 
-typ DivError = error {
+type DivError = error {
   DIVISOR_IS_ZERO,
 };
 
-fun div(a: F64, b: F64) -> F64 throw DivError {
+lit div = fun (a: F64, b: F64) -> F64 throw DivError {
   if (b == 0) {
     throw DivError.DIVISOR_IS_ZERO;
   }

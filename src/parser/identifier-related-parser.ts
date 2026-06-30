@@ -1,35 +1,78 @@
 import { TokenManager } from '@/parser/token-manager'
-import { AstNode } from '@/types/ast-node'
-import { Token } from '@/types/token'
+import { CompileError } from '@/error/compile-error'
+import { AstNode, AstNodeChildren } from '@/types/ast-node'
 
-import { parseSymbol } from '@/parser/symbol-related-parser'
+import { parseExpression } from '@/parser/expression-related-parser'
 import { parseTemplateArguments } from '@/parser/template-related-parser'
 
-export function parseIdentifier(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+export function parseIdentifierPath(tm: TokenManager): AstNode {
+  const path: AstNode[] = []
 
-  const symbol = parseSymbol(tm)
-
-  children.push(symbol)
+  const symbol = parseIdentifier(tm)
+  path.push(symbol)
 
   while (tm.peek()?.name === 'sign_::') {
     tm.next()
 
-    const subSymbol = parseSymbol(tm)
-    children.push(subSymbol)
+    const subSymbol = parseIdentifier(tm)
+    path.push(subSymbol)
+  }
+
+  return {
+    type: 'node',
+    name: 'idendifier_path',
+    children: {
+      path,
+    },
+  }
+}
+
+export function parseIdentifier(tm: TokenManager): AstNode {
+  const children: AstNodeChildren = {}
+
+  const firstToken = tm.expectPeekToBe()
+
+  switch (firstToken.name) {
+    case 'symbol':
+      children['name'] = tm.next()!
+      break
+    case 'sign_{{sym':
+      children['name'] = parseTemplateInterpolatedSymbol(tm)
+      break
+    default:
+      throw new CompileError(
+        `Unexpected token ${firstToken.name}, expect symbol or sign_{{sym`,
+        firstToken.start,
+      )
   }
 
   if (tm.peek()?.name === 'sign_<') {
-    const templateParam = parseTemplateArguments(tm)
+    const templateArguments = parseTemplateArguments(tm)
 
-    if (templateParam) {
-      children.push(templateParam)
+    if (templateArguments) {
+      children['templateArguments'] = templateArguments
     }
   }
 
   return {
     type: 'node',
-    name: 'identifier',
+    name: 'idendifier',
     children,
+  }
+}
+
+export function parseTemplateInterpolatedSymbol(tm: TokenManager): AstNode {
+  tm.expectNextToBe('sign_{{sym')
+
+  const expression = parseExpression(tm)
+
+  tm.expectNextToBe('sign_}}')
+
+  return {
+    type: 'node',
+    name: 'template_interpolated_symbol',
+    children: {
+      nameValue: expression,
+    },
   }
 }

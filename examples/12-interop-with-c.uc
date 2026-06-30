@@ -1,19 +1,17 @@
-package main;
+use header "myheader.h";
 
-use "myheader.h";
-
-use extern def funcInCHeader: const fun (a: I32, b: I32) -> I32;
-use extern typ StructInCHeader = struct {
+use extern lit funcInCHeader: (a: I32, b: I32) -> I32;
+use extern type StructInCHeader = struct {
   x: I32,
   y: I32,
 };
 use extern lit CONSTANT_IN_C_HEADER: I32;
 
-use "stdio.h";
+use header "stdio.h";
 
-use extern def printf: const fun (format: Slice<const U8>, ...args: Slice<Any>) -> Void;
+use extern lit printf: (format: Slice<const U8>, ...args: Slice<Any>) -> Void;
 
-fun add(a: I32, b: I32) -> I32 {
+lit add = fun (a: I32, b: I32) -> I32 {
   return a + b;
 };
 

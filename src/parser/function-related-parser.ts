@@ -1,36 +1,34 @@
 import { TokenManager } from '@/parser/token-manager'
-import { AstNode } from '@/types/ast-node'
-import { Token } from '@/types/token'
+import { AstNode, AstNodeChildren } from '@/types/ast-node'
 
-import { parseTypeConstraint } from '@/parser/type-related-parser'
+import { parseTypeExpression } from '@/parser/type-related-parser'
 import { parseExpression } from '@/parser/expression-related-parser'
-import { parseSymbol } from '@/parser/symbol-related-parser'
+import { parseIdentifier } from '@/parser/identifier-related-parser'
 
-export function parseFunctionParameters(tm: TokenManager): AstNode {
+export function parseFunctionParameters(tm: TokenManager): AstNode[] {
   tm.expectNextToBe('sign_(')
 
-  const children: (AstNode | Token)[] = []
+  const functionParameters: AstNode[] = []
 
   while (tm.peek()?.name !== 'sign_)') {
+    const children: AstNodeChildren = {}
+
     const isVariadic = tm.peek()?.name === 'sign_...'
 
     if (isVariadic) {
-      tm.next()
+      children['isVariadic'] = tm.next()!
     }
 
-    const name = parseSymbol(tm)
+    children['name'] = parseIdentifier(tm)
 
-    const typeConstraint = parseTypeConstraint(tm)
+    tm.expectNextToBe('sign_:')
 
-    children.push({
+    children['type'] = parseTypeExpression(tm)
+
+    functionParameters.push({
       type: 'node',
-      name: isVariadic
-        ? 'variadic_func_parameter'
-        : 'func_parameter',
-      children: [
-        name,
-        typeConstraint,
-      ],
+      name: 'func_parameter',
+      children,
     })
 
     if (tm.peek()?.name !== 'sign_)') {
@@ -44,20 +42,16 @@ export function parseFunctionParameters(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('sign_)')
 
-  return {
-    type: 'node',
-    name: 'function_parameters',
-    children,
-  }
+  return functionParameters
 }
 
-export function parseFunctionArguments(tm: TokenManager): AstNode {
+export function parseFunctionArguments(tm: TokenManager): AstNode[] {
   tm.expectNextToBe('sign_(')
 
-  const children: (AstNode | Token)[] = []
+  const functionArguments: AstNode[] = []
 
   while (tm.peek()?.name !== 'sign_)') {
-    children.push(parseExpression(tm))
+    functionArguments.push(parseExpression(tm))
 
     if (tm.peek()?.name !== 'sign_)') {
       tm.expectNextToBe('sign_,')
@@ -66,9 +60,5 @@ export function parseFunctionArguments(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('sign_)')
 
-  return {
-    type: 'node',
-    name: 'function_arguments',
-    children,
-  }
+  return functionArguments
 }

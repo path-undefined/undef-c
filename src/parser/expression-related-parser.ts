@@ -1,13 +1,11 @@
 import { TokenManager } from '@/parser/token-manager'
 import { CompileError } from '@/error/compile-error'
-import { AstNode } from '@/types/ast-node'
-import { Token } from '@/types/token'
+import { AstNode, AstNodeChildren } from '@/types/ast-node'
 
-import { parseIdentifier } from '@/parser/identifier-related-parser'
 import { parseLiteral } from '@/parser/literal-related-parser'
 import { parseFunctionArguments } from '@/parser/function-related-parser'
 import { parseTypeExpression } from '@/parser/type-related-parser'
-import { parseSymbol } from '@/parser/symbol-related-parser'
+import { parseIdentifier, parseIdentifierPath } from '@/parser/identifier-related-parser'
 import { parseBlockStatement } from '@/parser/statement-related-parser'
 
 export function parseExpression(tm: TokenManager): AstNode {
@@ -37,7 +35,7 @@ export function parseExpressionPrefix(tm: TokenManager): AstNode {
       return parseEvalExpression(tm)
     case 'symbol':
     case 'sign_{{sym':
-      return parseIdentifier(tm)
+      return parseIdentifierPath(tm)
     case 'literal_string':
     case 'literal_char':
     case 'literal_hex_integer':
@@ -48,7 +46,7 @@ export function parseExpressionPrefix(tm: TokenManager): AstNode {
     case 'literal_dec_float':
     case 'literal_bool':
     case 'literal_null':
-    case 'sign_{{lit':
+    case 'sign_{{val':
     case 'sign_[':
     case 'sign_{':
     case 'sign_(){':
@@ -64,7 +62,7 @@ export function parseExpressionPrefix(tm: TokenManager): AstNode {
     case 'keyword_alloc':
     case 'keyword_free':
     case 'keyword_init':
-    case 'keyword_clean':
+    case 'keyword_clear':
       return parseUnaryExpression(tm)
     default:
       throw new CompileError(
@@ -143,7 +141,7 @@ export function parseParenthesesExpression(tm: TokenManager): AstNode {
   const rightParenthesis = tm.next()
 
   if (!rightParenthesis) {
-    throw new CompileError('Parentheses not paired', tm.last()?.end)
+    throw new CompileError('Parentheses not paired', tm.last()!.end)
   }
 
   if (rightParenthesis.name !== 'sign_)') {
@@ -154,12 +152,12 @@ export function parseParenthesesExpression(tm: TokenManager): AstNode {
 }
 
 export function parseEvalExpression(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const statements: AstNode[] = []
 
   tm.expectNextToBe('sign_${')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseBlockStatement(tm))
+    statements.push(parseBlockStatement(tm))
   }
 
   tm.expectNextToBe('sign_}')
@@ -167,7 +165,9 @@ export function parseEvalExpression(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'eval_expression',
-    children,
+    children: {
+      statements,
+    },
   }
 }
 
@@ -178,10 +178,10 @@ export function parseAddressExpression(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'address_expression',
-    children: [
+    children: {
       operator,
       right,
-    ],
+    },
   }
 }
 
@@ -205,34 +205,40 @@ export function parseDataAccessExpression(tm: TokenManager, left: AstNode): AstN
 export function parseMemberAccessExpression(tm: TokenManager, left: AstNode): AstNode {
   tm.next()
 
-  const symbol = parseSymbol(tm)
+  const member = parseIdentifier(tm)
 
   return {
     type: 'node',
     name: 'member_access_expression',
-    children: [
+    children: {
       left,
-      symbol,
-    ],
+      member,
+    },
   }
 }
 
 export function parseIndexAccessExpression(tm: TokenManager, left: AstNode): AstNode {
-  tm.next()
+  const children: AstNodeChildren = {}
+  children['left'] = left
 
-  const children: (AstNode | Token)[] = []
+  tm.next()
 
   if (tm.peek()?.name !== 'sign_..') {
     const expression = parseExpression(tm)
-    children.push(expression)
+    children['index'] = expression
   }
 
   if (tm.peek()?.name === 'sign_..') {
-    children.push(tm.next()!)
+    tm.next()
+
+    if (children['index']) {
+      children['indexStart'] = children['index']
+      delete children['index']
+    }
 
     if (tm.peek()?.name !== 'sign_]') {
       const expression = parseExpression(tm)
-      children.push(expression)
+      children['indexEnd'] = expression
     }
   }
 
@@ -241,10 +247,7 @@ export function parseIndexAccessExpression(tm: TokenManager, left: AstNode): Ast
   return {
     type: 'node',
     name: 'index_access_expression',
-    children: [
-      left,
-      ...children,
-    ],
+    children,
   }
 }
 
@@ -254,10 +257,10 @@ export function parseFunctionInvokeExpression(tm: TokenManager, left: AstNode): 
   return {
     type: 'node',
     name: 'function_invoke_expression',
-    children: [
+    children: {
       left,
-      functionArguments,
-    ],
+      arguments: functionArguments,
+    },
   }
 }
 
@@ -269,41 +272,121 @@ export function parseTypeCastExpression(tm: TokenManager, left: AstNode): AstNod
   return {
     type: 'node',
     name: 'type_cast_expression',
-    children: [
+    children: {
       left,
       type,
-    ],
+    },
   }
 }
 
 export function parseUnaryExpression(tm: TokenManager): AstNode {
-  const operator = tm.next()!
+  const operator = tm.peek()!
 
   if (operator.name === 'keyword_alloc') {
-    const allocator = parseExpressionPratt(tm, 70)
-    const right = parseTypeExpression(tm)
-
-    return {
-      type: 'node',
-      name: 'unary_expression',
-      children: [
-        operator,
-        allocator,
-        right,
-      ],
-    }
+    return parseAllocExpression(tm)
+  }
+  else if (operator.name === 'keyword_free') {
+    return parseFreeExpression(tm)
+  }
+  else if (operator.name === 'keyword_init') {
+    return parseInitExpression(tm)
+  }
+  else if (operator.name === 'keyword_clear') {
+    return parseClearExpression(tm)
   }
   else {
+    tm.next()
+
     const right = parseExpressionPratt(tm, 70)
 
     return {
       type: 'node',
       name: 'unary_expression',
-      children: [
+      children: {
         operator,
         right,
-      ],
+      },
     }
+  }
+}
+
+function parseAllocExpression(tm: TokenManager): AstNode {
+  const children: AstNodeChildren = {}
+
+  tm.next()
+
+  if (tm.peek()?.name === 'sign_:') {
+    tm.next()
+    const allocator = parseIdentifierPath(tm)
+    children['allocator'] = allocator
+  }
+
+  const type = parseTypeExpression(tm)
+  children['type'] = type
+
+  if (tm.peek()?.name === 'keyword_count') {
+    tm.next()
+    const count = parseExpression(tm)
+    children['count'] = count
+  }
+
+  return {
+    type: 'node',
+    name: 'alloc_expression',
+    children,
+  }
+}
+
+function parseFreeExpression(tm: TokenManager): AstNode {
+  const children: AstNodeChildren = {}
+
+  tm.next()
+
+  if (tm.peek()?.name === 'sign_:') {
+    tm.next()
+
+    const allocator = parseIdentifierPath(tm)
+    children['allocator'] = allocator
+  }
+
+  const pointer = parseExpression(tm)
+  children['pointer'] = pointer
+
+  return {
+    type: 'node',
+    name: 'free_expression',
+    children,
+  }
+}
+
+function parseInitExpression(tm: TokenManager): AstNode {
+  tm.next()
+
+  const type = parseTypeExpression(tm)
+
+  const initFunctionArguments = parseFunctionArguments(tm)
+
+  return {
+    type: 'node',
+    name: 'init_expression',
+    children: {
+      type,
+      arguments: initFunctionArguments,
+    },
+  }
+}
+
+function parseClearExpression(tm: TokenManager): AstNode {
+  tm.next()
+
+  const reference = parseExpression(tm)
+
+  return {
+    type: 'node',
+    name: 'clear_expression',
+    children: {
+      reference,
+    },
   }
 }
 
@@ -314,11 +397,11 @@ export function parseBinaryExpression(tm: TokenManager, left: AstNode, precedenc
   return {
     type: 'node',
     name: 'binary_expression',
-    children: [
+    children: {
       left,
       operator,
       right,
-    ],
+    },
   }
 }
 
@@ -329,10 +412,10 @@ export function parseAssignmentExpression(tm: TokenManager, left: AstNode): AstN
   return {
     type: 'node',
     name: 'assignment_expression',
-    children: [
+    children: {
       left,
       operator,
       right,
-    ],
+    },
   }
 }

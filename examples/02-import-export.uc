@@ -1,13 +1,14 @@
-package main;
+use package std::math;
+use package mymath;
 
-use std::math::sin;
-use mymath::sin as mysin;
+use symbol std::math::sin;
+use symbol mymath::sin as mysin;
 
-def pi: const F64 = 3.1415926536;
+lit pi: const F64 = 3.1415926536;
 
-def result1 = sin(pi);
-def result2 = mysin(pi);
-def result3 = std::math::cos(pi);
+lit result1 = sin(pi);
+lit result2 = mysin(pi);
+lit result3 = std::math::cos(pi);
 
 export pi;
 export sin;

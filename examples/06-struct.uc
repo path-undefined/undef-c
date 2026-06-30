@@ -1,16 +1,16 @@
-package main;
+use package std::io;
 
-typ Person = struct {
+type Person = struct {
   public const name: Slice<const U8>,
   public const age: U8 = 0,
 
-  public getOlder: const = fun () -> Void {
+  public getOlder = fun () -> Void {
     this.age += 1;
   },
 };
 
-fun main() -> Void {
-  def person1 = { name = "John Doe", age = 36 }: Person;
+lit main = fun () -> Void {
+  def person1 = { name = "John Doe", age = 36 }:Person;
   def person2: Person = { name = "Jane Joe", age = 27 };
 
   person1.getOlder();

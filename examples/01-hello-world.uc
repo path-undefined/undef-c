@@ -1,6 +1,6 @@
-package main;
+use package std::io;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   // This is just a random comment
   std::io::printf("hello world\n");
 };

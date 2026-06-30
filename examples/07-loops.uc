@@ -1,6 +1,6 @@
-package main;
+use package std::io;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   def arr: Array<I32, 10>;
 
   for (def i: USize = 0; i < 10; i += 1) {

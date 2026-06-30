@@ -1,11 +1,11 @@
-package main;
+use package std::io;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   def pi: const F64 = 3.1415926536;
 
   std::io::printf("Contant pi is: %d.\n", pi);
 
-  def num: I32 = 36;
+  def num = 36:I32;
   def num = 37;
 
   std::io::printf("Variable num is now: %d.\n", num);

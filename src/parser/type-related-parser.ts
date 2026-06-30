@@ -1,38 +1,21 @@
 import { TokenManager } from '@/parser/token-manager'
 import { CompileError } from '@/error/compile-error'
-import { AstNode } from '@/types/ast-node'
+import { AstNode, AstNodeChildren } from '@/types/ast-node'
 
-import { parseIdentifier } from '@/parser/identifier-related-parser'
 import { parseLiteral } from '@/parser/literal-related-parser'
-import { parseSymbol } from '@/parser/symbol-related-parser'
+import { parseIdentifier, parseIdentifierPath } from '@/parser/identifier-related-parser'
 import { parseFunctionParameters } from '@/parser/function-related-parser'
 import { Token } from '@/types/token'
-
-export function parseTypeConstraint(tm: TokenManager): AstNode {
-  tm.expectNextToBe('sign_:')
-
-  const type = parseTypeExpression(tm)
-
-  return {
-    type: 'node',
-    name: 'type_constraint',
-    children: [
-      type,
-    ],
-  }
-}
 
 export function parseTypeExpression(tm: TokenManager): AstNode | Token {
   const firstToken = tm.expectPeekToBe()
 
   switch (firstToken.name) {
-    case 'keyword_any':
-      return parseAnyTypeExpression(tm)
     case 'keyword_const':
       return parseModifiedTypeExpression(tm)
     case 'symbol':
     case 'sign_{{sym':
-      return parseIdentifier(tm)
+      return parseIdentifierPath(tm)
     case 'sign_(':
       return parseFunctionTypeExpression(tm)
     case 'keyword_struct':
@@ -49,22 +32,25 @@ export function parseTypeExpression(tm: TokenManager): AstNode | Token {
 }
 
 export function parseFunctionTypeExpression(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const children: AstNodeChildren = {}
 
   const parameters = parseFunctionParameters(tm)
-  children.push(parameters)
+  children['parameters'] = parameters
 
   tm.expectNextToBe('sign_->')
 
   const returnType = parseTypeExpression(tm)
-  children.push(returnType)
+  children['returnType'] = returnType
 
+  const throwTypes: AstNode[] = []
   while (tm.peek()?.name === 'keyword_throw') {
     tm.next()
 
     const errorType = parseTypeExpression(tm)
-    children.push(errorType)
+    throwTypes.push(errorType)
   }
+
+  children['throwTypes'] = throwTypes
 
   return {
     type: 'node',
@@ -74,14 +60,14 @@ export function parseFunctionTypeExpression(tm: TokenManager): AstNode {
 }
 
 export function parseStructTypeExpression(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const entries: AstNode[] = []
 
   tm.expectNextToBe('keyword_struct')
 
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseStructEntry(tm))
+    entries.push(parseStructEntry(tm))
 
     if (tm.peek()?.name !== 'sign_}') {
       tm.expectNextToBe('sign_,')
@@ -93,27 +79,26 @@ export function parseStructTypeExpression(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'struct_type_expression',
-    children,
+    children: {
+      entries,
+    },
   }
 }
 
 export function parseStructEntry(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const children: AstNodeChildren = {}
 
   const scope = tm.expectPeekToBe()
 
-  switch (scope.name) {
-    case 'keyword_public':
-    case 'keyword_private':
-      children.push(tm.next()!)
-      break
+  if ([
+    'keyword_public',
+    'keyword_private',
+  ].includes(tm.peek()?.name ?? '')) {
+    children['accessibility'] = tm.next()!
   }
 
-  const writability = tm.expectPeekToBe()
-  switch (writability.name) {
-    case 'keyword_const':
-      children.push(tm.next()!)
-      break
+  if (tm.peek()?.name === 'keyword_const') {
+    children['mutability'] = tm.next()!
   }
 
   const symbol = tm.expectPeekToBe()
@@ -121,12 +106,12 @@ export function parseStructEntry(tm: TokenManager): AstNode {
   switch (symbol.name) {
     case 'keyword_init':
     case 'keyword_clear': {
-      children.push(tm.next()!)
+      children['name'] = tm.next()!
       break
     }
     case 'symbol':
     case 'sign_{{sym': {
-      children.push(parseSymbol(tm))
+      children['name'] = parseIdentifier(tm)
       break
     }
     default:
@@ -136,13 +121,18 @@ export function parseStructEntry(tm: TokenManager): AstNode {
       )
   }
 
-  const type = parseTypeConstraint(tm)
-  children.push(type)
+  if (tm.peek()?.name === 'sign_:') {
+    tm.next()
+
+    const type = parseTypeExpression(tm)
+    children['type'] = type
+  }
 
   if (tm.peek()?.name === 'sign_=') {
     tm.next()
+
     const initialValue = parseLiteral(tm)
-    children.push(initialValue)
+    children['value'] = initialValue
   }
 
   return {
@@ -153,14 +143,14 @@ export function parseStructEntry(tm: TokenManager): AstNode {
 }
 
 export function parseUnionTypeExpression(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const entries: AstNode[] = []
 
   tm.expectNextToBe('keyword_union')
 
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseUnionEntry(tm))
+    entries.push(parseUnionEntry(tm))
 
     if (tm.peek()?.name !== 'sign_}') {
       tm.expectNextToBe('sign_,')
@@ -172,23 +162,26 @@ export function parseUnionTypeExpression(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'union_type_expression',
-    children,
+    children: {
+      entries,
+    },
   }
 }
 
 export function parseUnionEntry(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const children: AstNodeChildren = {}
 
   const nextToken = tm.expectPeekToBe()
 
   switch (nextToken.name) {
     case 'symbol':
     case 'sign_{{sym':
-      children.push(parseSymbol(tm))
-      children.push(parseTypeConstraint(tm))
+      children['name'] = parseIdentifier(tm)
+      tm.expectNextToBe('sign_:')
+      children['type'] = parseTypeExpression(tm)
       break
     default:
-      children.push(parseTypeExpression(tm))
+      children['type'] = parseTypeExpression(tm)
   }
 
   return {
@@ -199,14 +192,14 @@ export function parseUnionEntry(tm: TokenManager): AstNode {
 }
 
 export function parseEnumTypeExpression(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const entries: AstNode[] = []
 
   tm.expectNextToBe('keyword_enum')
 
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    children.push(parseEnumEntry(tm))
+    entries.push(parseEnumEntry(tm))
 
     if (tm.peek()?.name !== 'sign_}') {
       tm.expectNextToBe('sign_,')
@@ -215,26 +208,30 @@ export function parseEnumTypeExpression(tm: TokenManager): AstNode {
 
   tm.expectNextToBe('sign_}')
 
-  const type = parseTypeConstraint(tm)
-  children.push(type)
+  tm.expectNextToBe('sign_:')
+
+  const type = parseTypeExpression(tm)
 
   return {
     type: 'node',
     name: 'enum_type_expression',
-    children,
+    children: {
+      entries,
+      type,
+    },
   }
 }
 
 export function parseEnumEntry(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const children: AstNodeChildren = {}
 
-  const symbol = parseSymbol(tm)
-  children.push(symbol)
+  const symbol = parseIdentifier(tm)
+  children['name'] = symbol
 
   if (tm.peek()?.name === 'sign_=') {
     tm.next()
     const value = parseLiteral(tm)
-    children.push(value)
+    children['value'] = value
   }
 
   return {
@@ -245,15 +242,15 @@ export function parseEnumEntry(tm: TokenManager): AstNode {
 }
 
 export function parseErrorTypeExpression(tm: TokenManager): AstNode {
-  const children: (AstNode | Token)[] = []
+  const entries: AstNode[] = []
 
   tm.expectNextToBe('keyword_error')
 
   tm.expectNextToBe('sign_{')
 
   while (tm.peek()?.name !== 'sign_}') {
-    const symbol = parseSymbol(tm)
-    children.push(symbol)
+    const symbol = parseIdentifier(tm)
+    entries.push(symbol)
 
     if (tm.peek()?.name !== 'sign_}') {
       tm.expectNextToBe('sign_,')
@@ -265,18 +262,16 @@ export function parseErrorTypeExpression(tm: TokenManager): AstNode {
   return {
     type: 'node',
     name: 'error_type_expression',
-    children,
+    children: {
+      entries,
+    },
   }
-}
-
-export function parseAnyTypeExpression(tm: TokenManager): AstNode | Token {
-  return tm.expectNextToBe('keyword_any')
 }
 
 export function parseModifiedTypeExpression(tm: TokenManager): AstNode {
   const modifier = tm.next()!
 
-  if (![
+  if ([
     'symbol',
     'keyword_fun',
     'keyword_struct',
@@ -284,23 +279,24 @@ export function parseModifiedTypeExpression(tm: TokenManager): AstNode {
     'keyword_enum',
     'keyword_error',
   ].includes(tm.peek()?.name ?? '')) {
+    const type = parseTypeExpression(tm)
+
     return {
       type: 'node',
       name: 'modified_type_expression',
-      children: [
+      children: {
         modifier,
-      ],
+        type,
+      },
     }
   }
-
-  const type = parseTypeExpression(tm)
-
-  return {
-    type: 'node',
-    name: 'modified_type_expression',
-    children: [
-      modifier,
-      type,
-    ],
+  else {
+    return {
+      type: 'node',
+      name: 'modified_type_expression',
+      children: {
+        modifier,
+      },
+    }
   }
 }

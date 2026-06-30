@@ -3,7 +3,7 @@
 A list of operators in the order of precedence:
 
 ```
-MAX  Value:        () identifiers literals {{lit}} ${}
+MAX  Value:        () identifiers literals {{val}} ${}
  90  Address:      $ @
  80  DataAccess:   . [] () :
  70  Unary:        + - ! ~ alloc free init clean

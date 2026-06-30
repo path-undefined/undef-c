@@ -1,6 +1,6 @@
-package main;
+use package std::io;
 
-fun main() -> Void {
+lit main = fun () -> Void {
   def arr1 = [ 1, 2, 3, 4 ]:Array<I32>;
   def arr2: Array<I32, 4> = [5, 6, 7, 8];
 

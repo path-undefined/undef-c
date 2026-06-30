@@ -7,15 +7,17 @@ import { parseGlobalStatement } from '@/parser/statement-related-parser'
 export function parse(tokens: Token[]): AstNode {
   const tm = new TokenManager(tokens)
 
-  const children: (AstNode | Token)[] = []
+  const globalStatements: AstNode[] = []
 
   while (tm.peek()) {
-    children.push(parseGlobalStatement(tm)!)
+    globalStatements.push(parseGlobalStatement(tm))
   }
 
   return {
     type: 'node',
     name: 'root',
-    children,
+    children: {
+      globalStatements,
+    },
   }
 }

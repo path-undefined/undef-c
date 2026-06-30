@@ -1,6 +1,6 @@
-package main;
+use package std::io;
 
-typ Color = union {
+type Color = union {
   value: U32,
   struct {
     r: U8,
@@ -10,8 +10,8 @@ typ Color = union {
   },
 };
 
-fun main() -> Void {
-  def color = { value = 0xEE8800FF }: Color;
+lit main = fun () -> Void {
+  def color = { value = 0xEE8800FF }:Color;
 
   std::io::printf("The Hex value of the color is %0x08X.\n", color.value);
   std::io::printf("The RGBA value of the color is (r:%d, g:%d, b:%d, a:%d).\n", color.r, color.g, color.b, color.a);

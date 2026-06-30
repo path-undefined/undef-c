@@ -1,35 +1,39 @@
-package main;
+use package std::io;
 
-tmpl Box<T: Type> {
-  typ Box<{{sym T}}> = struct {
+template Box<T: Type> {
+  type this = struct {
     public const value: {{sym T}},
 
-    set: const = fun (v: {{sym T}}) -> Void {
+    public init = fun (v: {{sym T}}) -> Void {
       this.value = v;
     },
-    get: const = fun () -> {{sym T}} {
+
+    public set = fun (v: {{sym T}}) -> Void {
+      this.value = v;
+    },
+    public get = fun () -> {{sym T}} {
       return this.value;
     },
   };
 }
 
-tmpl Serialize<T: Type> {
-  fun serialize<{{sym T}}>(data: {{sym T}}) -> Void {
+template serialize<T: Type> {
+  lit this = fun (data: {{sym T}}) -> Void {
     {{meta T as ti}}
 
     {{if !ti.isStruct}}
       {{throw "Value to be serialized must be a struct"}}
     {{/if}}
 
-    {{for field in ti.fields}}
-      std::io::printf("%s: %v\n", {{lit field.name}}, data.{{sym field.name}});
-    {{/for}}
+    {{foreach ti.fields as field}}
+      std::io::printf("%s: %v\n", {{val field.name}}, data.{{sym field.name}});
+    {{/foreach}}
   };
 }
 
-tmpl Fib<N: I32> {
-  {{eval
-    fun getFib(n: I32) -> I32 {
+template FIB<N: I32> {
+  {{exec
+    lit getFib = fun (n: I32) -> I32 {
       if (n == 1 || n == 2) {
         return 1;
       } else {
@@ -38,22 +42,20 @@ tmpl Fib<N: I32> {
     };
   }}
 
-  lit fib<{{sym N}}>: I32 = {{lit getFib(N)}};
+  lit this: I32 = {{val getFib(N)}};
 }
 
-fun main() -> Void {
-  use tmpl Box<I32>;
+lit main = fun () -> Void {
+  use template Box<I32>;
+  use template serialize<Box<I32>>;
+  use template FIB<5>;
 
-  def box = { value = 36 }: Box<I32>;
+  def box: Box<I32> = init Box<I32>(36);
   box.set(37);
 
   std::io::printf("The boxed value is %d.\n", box.get());
 
-  use tmpl Serialize<Box<I32>>;
-
   serialize<Box<I32>>(box);
 
-  use tmpl Fib<5>;
-
-  std::io::printf("The 5th number of fibonacci sequence is %d.\n", fib<5>);
+  std::io::printf("The 5th number of fibonacci sequence is %d.\n", FIB<5>);
 };

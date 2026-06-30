@@ -1,7 +1,15 @@
 import { Token } from '@/types/token'
 
-export type AstNode = {
+export type AstNode
+  = | AstBranchNode
+    | AstLeafNode
+
+export type AstBranchNode = {
   type: 'node'
   name: string
-  children: (AstNode | Token)[]
+  children: AstNodeChildren
 }
+
+export type AstLeafNode = Token
+
+export type AstNodeChildren = Record<string, AstNode | AstNode[]>
